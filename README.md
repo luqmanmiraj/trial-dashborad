@@ -2,7 +2,8 @@
 
 A modern, futuristic, and minimalist dark-themed web application dashboard built with Next.js, featuring real-time commodity price tracking and secure authentication.
 
-![Dashboard Preview](https://via.placeholder.com/800x400/0b0f12/10b981?text=Energy+Trading+Dashboard)
+![Dashboard Preview] <img width="1903" height="863" alt="image" src="https://github.com/user-attachments/assets/c233bc1f-2f9f-4d5f-a81c-809b5f7c1077" />
+
 
 ## ✨ Features
 
