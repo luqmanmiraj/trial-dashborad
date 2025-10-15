@@ -38,7 +38,7 @@ function LoginForm() {
           value={username}
           onChange={(e) => setUsername(e.target.value)}
           className="w-full mb-4 rounded-md bg-black/40 border border-white/10 px-3 py-2 outline-none focus:ring-2 focus:ring-emerald-500/60"
-          placeholder="admin"
+          placeholder="user"
         />
         <label className="block text-sm mb-1">Password</label>
         <input
@@ -46,7 +46,7 @@ function LoginForm() {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           className="w-full mb-6 rounded-md bg-black/40 border border-white/10 px-3 py-2 outline-none focus:ring-2 focus:ring-emerald-500/60"
-          placeholder="password"
+          placeholder="$TEKjin00is~99"
         />
         {error && <p className="text-red-400 text-sm mb-3">{error}</p>}
         <button
