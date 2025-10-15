@@ -24,8 +24,8 @@ function MiniChart({ title, series, up }: { title: string; series: SeriesPoint[]
   const pad = Number.isFinite(min) && Number.isFinite(max) ? Math.max((max - min) * 0.1, (max || 1) * 0.001) : 1;
 
   return (
-    <div className="rounded-xl border border-white/10 bg-[#0f1418] p-4 flex-1 h-[200px] flex flex-col">
-      <div className="text-sm text-white/70 mb-2 flex items-center justify-between">
+    <div className="rounded-xl border border-white/10 bg-[#0f1418] flex-1 h-[200px] flex flex-col">
+      <div className="text-sm text-white/70 px-4 py-2 flex items-center justify-between">
         <span className="font-medium">{title}</span>
         {last !== null && (
           <span className={`tabular-nums ${change !== null && change >= 0 ? "text-emerald-300" : "text-red-300"}`}>
