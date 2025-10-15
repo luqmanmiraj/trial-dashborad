@@ -1,6 +1,6 @@
 "use client";
 import useSWR from "swr";
-import { Area, AreaChart, ResponsiveContainer, YAxis, XAxis, Tooltip } from "recharts";
+import { Area, AreaChart, ResponsiveContainer, YAxis, XAxis } from "recharts";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -24,9 +24,9 @@ function MiniChart({ title, series, up }: { title: string; series: SeriesPoint[]
   const pad = Number.isFinite(min) && Number.isFinite(max) ? Math.max((max - min) * 0.1, (max || 1) * 0.001) : 1;
 
   return (
-    <div className="rounded-xl border border-white/10 bg-[#0f1418] p-3 w-[260px] h-[130px]">
-      <div className="text-xs text-white/70 mb-1 flex items-center justify-between">
-        <span>{title}</span>
+    <div className="rounded-xl border border-white/10 bg-[#0f1418] p-4 flex-1 h-[200px] flex flex-col">
+      <div className="text-sm text-white/70 mb-2 flex items-center justify-between">
+        <span className="font-medium">{title}</span>
         {last !== null && (
           <span className={`tabular-nums ${change !== null && change >= 0 ? "text-emerald-300" : "text-red-300"}`}>
             {last.toFixed(3)}{change !== null && (
@@ -35,7 +35,7 @@ function MiniChart({ title, series, up }: { title: string; series: SeriesPoint[]
           </span>
         )}
       </div>
-      <div className="w-full h-[90px]">
+      <div className="flex-1 w-full">
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={data} margin={{ left: 0, right: 0, top: 0, bottom: 0 }}>
             <defs>
@@ -46,11 +46,6 @@ function MiniChart({ title, series, up }: { title: string; series: SeriesPoint[]
             </defs>
             <YAxis hide domain={[min - pad, max + pad]} />
             <XAxis hide dataKey="x" type="number" domain={["auto", "auto"]} />
-            <Tooltip
-              contentStyle={{ background: "#0f1418", border: "1px solid rgba(255,255,255,0.1)", color: "#fff" }}
-              formatter={(value: any) => [Number(value).toFixed(4), "Price"]}
-              labelFormatter={(label) => new Date(label as number).toLocaleTimeString()}
-            />
             <Area type="monotone" dataKey="y" stroke={color} fill={`url(#${safeId})`} strokeWidth={2} />
           </AreaChart>
         </ResponsiveContainer>
@@ -130,7 +125,7 @@ export default function DashboardPage() {
         </div>
         <div className="h-px bg-white/10 my-4" />
 
-        <div className="flex flex-wrap gap-4 items-start">
+        <div className="grid grid-cols-4 gap-4 w-full">
           {charts.map((name) => (
             <MiniChart
               key={name}
