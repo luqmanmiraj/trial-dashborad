@@ -1,8 +1,8 @@
 "use client";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { useState, Suspense } from "react";
 
-export default function LoginPage() {
+function LoginForm() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -57,6 +57,25 @@ export default function LoginPage() {
         </button>
       </form>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-[#0b0f12] text-white flex items-center justify-center p-6">
+        <div className="w-full max-w-sm bg-[#12171b] rounded-xl border border-white/10 p-6 shadow-[0_0_40px_rgba(0,0,0,0.5)]">
+          <h1 className="text-2xl font-semibold tracking-wide mb-6">Sign in</h1>
+          <div className="animate-pulse">
+            <div className="h-10 bg-white/10 rounded-md mb-4"></div>
+            <div className="h-10 bg-white/10 rounded-md mb-6"></div>
+            <div className="h-10 bg-white/10 rounded-md"></div>
+          </div>
+        </div>
+      </div>
+    }>
+      <LoginForm />
+    </Suspense>
   );
 }
 
