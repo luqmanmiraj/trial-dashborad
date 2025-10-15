@@ -169,27 +169,27 @@ The dashboard displays times in multiple time zones:
 ## 🚀 Deployment
 
 ### 🌐 Live Demo
-**Vercel Deployment**: [https://trial-dashborad.vercel.app](https://trial-dashborad.vercel.app)
+**Netlify Deployment**: [https://trial-dashborad.netlify.app](https://trial-dashborad.netlify.app)
 
-### 📦 Deploy to Vercel
+### 📦 Deploy to Netlify
 
-1. **Install Vercel CLI**:
-   ```bash
-   npm install -g vercel
-   ```
+1. **Connect GitHub Repository**:
+   - Go to [netlify.com](https://netlify.com)
+   - Click "Add new site" → "Import an existing project"
+   - Connect your GitHub account
+   - Select your `trial-dashborad` repository
 
-2. **Deploy from GitHub**:
-   ```bash
-   vercel --prod
-   ```
+2. **Build Settings** (Auto-detected):
+   - **Build command**: `npm run build`
+   - **Publish directory**: `.next`
+   - **Node version**: 18
 
-3. **Or Deploy via Vercel Dashboard**:
-   - Go to [vercel.com](https://vercel.com)
-   - Import your GitHub repository
-   - Deploy automatically
+3. **Deploy**:
+   - Click "Deploy site"
+   - Netlify will automatically build and deploy your app
 
 ### 🔧 Environment Variables
-For production deployment, set these in Vercel dashboard:
+For production deployment, set these in Netlify dashboard:
 ```env
 NODE_ENV=production
 ```
@@ -201,9 +201,10 @@ npm run start
 ```
 
 ### 🗄️ Database in Production
-- **SQLite**: Works on Vercel with serverless functions
+- **SQLite**: Works on Netlify with serverless functions
 - **Database File**: Automatically created on first deployment
 - **Admin User**: Created automatically via initialization script
+- **Note**: For persistent data, consider upgrading to a managed database
 
 ## 🤝 Contributing
 
