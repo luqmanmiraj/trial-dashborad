@@ -25,8 +25,8 @@ export function getDatabase(): sqlite3.Database {
           console.error('Error checking admin user:', err);
           return;
         }
-        
-        if (row.count === 0) {
+        const count = row?.count ?? 0;
+        if (count === 0) {
           // Import bcryptjs here to avoid issues with ES modules
           import('bcryptjs').then((bcrypt) => {
             const hashedPassword = bcrypt.hashSync('password', 10);
@@ -55,4 +55,23 @@ export function closeDatabase(): void {
     db.close();
     db = null;
   }
+}
+
+// Small promise helpers to use async/await cleanly in route handlers
+export function dbGet<T>(database: sqlite3.Database, sql: string, params: unknown[] = []): Promise<T | undefined> {
+  return new Promise((resolve, reject) => {
+    database.get(sql, params, (err, row) => {
+      if (err) return reject(err);
+      resolve(row as T | undefined);
+    });
+  });
+}
+
+export function dbRun(database: sqlite3.Database, sql: string, params: unknown[] = []): Promise<void> {
+  return new Promise((resolve, reject) => {
+    database.run(sql, params, (err) => {
+      if (err) return reject(err);
+      resolve();
+    });
+  });
 }

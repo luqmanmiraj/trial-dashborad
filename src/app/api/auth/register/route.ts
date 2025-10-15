@@ -1,60 +1,28 @@
 import { NextResponse } from "next/server";
-import { getDatabase } from "@/lib/database";
+import { getDatabase, dbGet, dbRun } from "@/lib/database";
 import bcrypt from "bcryptjs";
 
-export async function POST(request: Request) {
+export async function POST(request: Request): Promise<Response> {
   try {
-    const { username, password } = await request.json().catch(() => ({}));
-    
+    const body = await request.json().catch(() => ({} as { username?: string; password?: string }));
+    const { username, password } = body;
+
     if (!username || !password) {
       return NextResponse.json({ message: "Username and password required" }, { status: 400 });
     }
-
     if (password.length < 6) {
       return NextResponse.json({ message: "Password must be at least 6 characters" }, { status: 400 });
     }
 
     const db = getDatabase();
-    
-    return new Promise((resolve) => {
-      // Check if user already exists
-      db.get(
-        "SELECT id FROM users WHERE username = ?",
-        [username],
-        (err, row: { id: number } | undefined) => {
-          if (err) {
-            console.error('Database error:', err);
-            resolve(NextResponse.json({ message: "Registration error" }, { status: 500 }));
-            return;
-          }
+    const exists = await dbGet<{ id: number }>(db, "SELECT id FROM users WHERE username = ?", [username]);
+    if (exists) {
+      return NextResponse.json({ message: "Username already exists" }, { status: 409 });
+    }
 
-          if (row) {
-            resolve(NextResponse.json({ message: "Username already exists" }, { status: 409 }));
-            return;
-          }
-
-          // Hash password and create user
-          const hashedPassword = bcrypt.hashSync(password, 10);
-          
-          db.run(
-            "INSERT INTO users (username, password_hash) VALUES (?, ?)",
-            [username, hashedPassword],
-            function(err) {
-              if (err) {
-                console.error('Error creating user:', err);
-                resolve(NextResponse.json({ message: "Registration error" }, { status: 500 }));
-                return;
-              }
-
-              resolve(NextResponse.json({ 
-                message: "User created successfully",
-                userId: this.lastID 
-              }));
-            }
-          );
-        }
-      );
-    });
+    const hashedPassword = await bcrypt.hash(password, 10);
+    await dbRun(db, "INSERT INTO users (username, password_hash) VALUES (?, ?)", [username, hashedPassword]);
+    return NextResponse.json({ message: "User created successfully" });
   } catch (error) {
     console.error('Registration error:', error);
     return NextResponse.json({ message: "Registration error" }, { status: 500 });
