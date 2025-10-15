@@ -168,21 +168,42 @@ The dashboard displays times in multiple time zones:
 
 ## 🚀 Deployment
 
-### Environment Variables
-Create a `.env.local` file:
-```env
-# Optional: Custom port
-PORT=3000
+### 🌐 Live Demo
+**Vercel Deployment**: [https://trial-dashborad.vercel.app](https://trial-dashborad.vercel.app)
 
-# Optional: Database path
-DATABASE_PATH=./auth.db
+### 📦 Deploy to Vercel
+
+1. **Install Vercel CLI**:
+   ```bash
+   npm install -g vercel
+   ```
+
+2. **Deploy from GitHub**:
+   ```bash
+   vercel --prod
+   ```
+
+3. **Or Deploy via Vercel Dashboard**:
+   - Go to [vercel.com](https://vercel.com)
+   - Import your GitHub repository
+   - Deploy automatically
+
+### 🔧 Environment Variables
+For production deployment, set these in Vercel dashboard:
+```env
+NODE_ENV=production
 ```
 
-### Production Build
+### 📊 Production Build
 ```bash
 npm run build
 npm run start
 ```
+
+### 🗄️ Database in Production
+- **SQLite**: Works on Vercel with serverless functions
+- **Database File**: Automatically created on first deployment
+- **Admin User**: Created automatically via initialization script
 
 ## 🤝 Contributing
 
@@ -200,7 +221,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 If you encounter any issues or have questions:
 
-1. Check the [Issues](https://github.com/YOUR_USERNAME/trial-dashborad/issues) page
+1. Check the [Issues](https://github.com/luqmanmiraj/trial-dashborad/issues) page
 2. Create a new issue with detailed information
 3. Include error logs and steps to reproduce
 
