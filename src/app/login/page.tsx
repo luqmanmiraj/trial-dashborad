@@ -67,7 +67,7 @@ function LoginForm() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="w-full rounded-lg bg-black/30 border border-white/10 px-4 py-3 outline-none focus:ring-2 focus:ring-emerald-500/60 focus:border-emerald-500/50 hover:border-white/20 transition-all duration-300 placeholder-gray-500"
-              placeholder="$TEKjin00is~99"
+              placeholder="password"
             />
           </div>
           
