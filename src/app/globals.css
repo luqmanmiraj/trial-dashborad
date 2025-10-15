@@ -17,3 +17,28 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Custom animations */
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  10%, 30%, 50%, 70%, 90% { transform: translateX(-4px); }
+  20%, 40%, 60%, 80% { transform: translateX(4px); }
+}
+
+.animate-shake {
+  animation: shake 0.5s ease-in-out;
+}
+
+/* Smooth focus transitions */
+input:focus {
+  transform: scale(1.02);
+}
+
+input:hover {
+  transform: scale(1.01);
+}
+
+/* Glow effect for form */
+form:hover {
+  box-shadow: 0 0 80px rgba(16, 185, 129, 0.2), 0 0 120px rgba(59, 130, 246, 0.1);
+}
