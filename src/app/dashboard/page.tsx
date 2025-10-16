@@ -2,7 +2,7 @@
 import useSWR from "swr";
 import { Area, AreaChart, ResponsiveContainer, YAxis, XAxis } from "recharts";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type SeriesPoint = { t: number; c: number };
 
@@ -64,10 +64,159 @@ function MiniChart({ title, series, up }: { title: string; series: SeriesPoint[]
   );
 }
 
+type NominationFormData = {
+  vessel_name: string;
+  vessel_imo: string;
+  vessel_port: string;
+  mgo_tons: string;
+  mgo_price: string;
+  ifo_tons: string;
+  ifo_price: string;
+  vessel_supply_date: string; // DD.MM.YYYY
+  vessel_trader: string;
+  vessel_agent: string;
+};
+
+function NominationForm({ onClose }: { onClose: () => void }) {
+  const [submitting, setSubmitting] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const dateRef = useRef<HTMLInputElement | null>(null);
+  const [form, setForm] = useState<NominationFormData>({
+    vessel_name: "",
+    vessel_imo: "",
+    vessel_port: "",
+    mgo_tons: "0",
+    mgo_price: "0",
+    ifo_tons: "0",
+    ifo_price: "0",
+    vessel_supply_date: "",
+    vessel_trader: "",
+    vessel_agent: "",
+  });
+
+  const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
+  const update = (k: keyof NominationFormData, v: string) => setForm((f) => ({ ...f, [k]: v }));
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+    setMessage(null);
+    try {
+      const supplyDateFormatted = (() => {
+        // If user picked a native date (yyyy-mm-dd), convert to DD.MM.YYYY as required
+        const v = form.vessel_supply_date?.trim();
+        if (!v) return "";
+        if (/^\d{4}-\d{2}-\d{2}$/.test(v)) {
+          const [y, m, d] = v.split("-");
+          return `${d}.${m}.${y}`;
+        }
+        return v;
+      })();
+      const res = await fetch(`${apiBase}/endpoint1`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          vessel_name: form.vessel_name,
+          vessel_imo: Number(form.vessel_imo || 0),
+          vessel_port: form.vessel_port,
+          mgo_tons: form.mgo_tons,
+          mgo_price: Number(form.mgo_price || 0),
+          ifo_tons: form.ifo_tons,
+          ifo_price: Number(form.ifo_price || 0),
+          vessel_supply_date: supplyDateFormatted,
+          vessel_trader: form.vessel_trader,
+          vessel_agent: form.vessel_agent,
+        }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      setMessage(`Generated: ${data?.pdf || "success"}`);
+    } catch (err: any) {
+      setMessage(`Error: ${err?.message || "failed"}`);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const input = (
+    name: keyof NominationFormData,
+    label: string,
+    props?: React.InputHTMLAttributes<HTMLInputElement>
+  ) => (
+    <label className="grid gap-1">
+      <span className="text-sm text-white/70">{label}</span>
+      <input
+        className="bg-white/5 border border-white/10 rounded-md px-3 py-2 outline-none focus:border-emerald-400/50"
+        value={form[name]}
+        onChange={(e) => update(name, e.target.value)}
+        {...props}
+      />
+    </label>
+  );
+
+  return (
+    <form onSubmit={submit} className="rounded-xl border border-white/10 bg-[#0f1418] p-4 grid gap-3">
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-medium">Generate nomination</h3>
+        <button type="button" className="text-white/60 hover:text-white" onClick={onClose}>Close</button>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {input("vessel_name", "Vessel name")}
+        {input("vessel_imo", "Vessel IMO", { inputMode: "numeric" })}
+        {input("vessel_port", "Port")}
+        {/* Date field with explicit trigger to ensure picker opens */}
+        <label className="grid gap-1">
+          <span className="text-sm text-white/70">Supply date</span>
+          <div className="relative">
+            <input
+              ref={dateRef}
+              type="date"
+              className="bg-white/5 border border-white/10 rounded-md pl-3 pr-10 py-2 w-full outline-none focus:border-emerald-400/50"
+              value={form.vessel_supply_date}
+              onChange={(e) => update("vessel_supply_date", e.target.value)}
+              style={{ backgroundImage: "none" }}
+            />
+            <button
+              type="button"
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-white/80 hover:text-white"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                try { (dateRef.current as any)?.showPicker?.(); } catch {}
+              }}
+              aria-label="Open calendar"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                <line x1="16" y1="2" x2="16" y2="6" />
+                <line x1="8" y1="2" x2="8" y2="6" />
+                <line x1="3" y1="10" x2="21" y2="10" />
+              </svg>
+            </button>
+          </div>
+        </label>
+        {input("mgo_tons", "MGO tons", { inputMode: "numeric" })}
+        {input("mgo_price", "MGO price", { inputMode: "decimal" })}
+        {input("ifo_tons", "IFO tons", { inputMode: "numeric" })}
+        {input("ifo_price", "IFO price", { inputMode: "decimal" })}
+        {input("vessel_trader", "Trader")}
+        {input("vessel_agent", "Agent")}
+      </div>
+      <div className="flex items-center gap-3">
+        <button disabled={submitting} className="px-4 py-2 rounded-md bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50">
+          {submitting ? "Generating…" : "Generate & email"}
+        </button>
+        {message && <span className="text-sm text-white/70">{message}</span>}
+      </div>
+    </form>
+  );
+}
+
 export default function DashboardPage() {
   const { data } = useSWR<PriceResp>("/api/prices", fetcher, { refreshInterval: 60_000 });
   const router = useRouter();
   const [now, setNow] = useState<Date>(new Date());
+  const [showForm, setShowForm] = useState<boolean>(false);
 
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 60_000);
@@ -148,17 +297,29 @@ export default function DashboardPage() {
 
         <div className="h-px bg-white/10 my-6" />
 
-        <div className="grid gap-3 max-w-sm">
-          {["Initiate new request", "Generate first nomination", "Generate final nomination", "Generate invoice", "Record trade"].map(
-            (label) => (
-              <button
-                key={label}
-                className="text-left px-4 py-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 transition"
-              >
-                {label}
-              </button>
-            )
-          )}
+        <div className="grid grid-cols-1 lg:grid-cols-[320px_minmax(0,1fr)] gap-6 items-start">
+          <div className="grid gap-3">
+            {["Initiate new request", "Generate first nomination", "Generate final nomination", "Generate invoice", "Record trade"].map(
+              (label) => (
+                <button
+                  key={label}
+                  onClick={() => setShowForm(label !== "Generate invoice" && label !== "Record trade")}
+                  className="text-left px-4 py-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 transition"
+                >
+                  {label}
+                </button>
+              )
+            )}
+          </div>
+          <div className="min-h-[320px]">
+            {showForm ? (
+              <NominationForm onClose={() => setShowForm(false)} />
+            ) : (
+              <div className="rounded-xl border border-white/10 bg-white/[0.02] h-full grid place-items-center text-white/50">
+                Select an action to open the form
+              </div>
+            )}
+          </div>
         </div>
       </main>
     </div>
