@@ -24,18 +24,8 @@ function MiniChart({ title, series, up }: { title: string; series: SeriesPoint[]
   const pad = Number.isFinite(min) && Number.isFinite(max) ? Math.max((max - min) * 0.1, (max || 1) * 0.001) : 1;
 
   return (
-    <div className="rounded-xl border border-white/10 bg-[#0f1418] flex-1 h-[200px] flex flex-col">
-      <div className="text-sm text-white/70 px-4 py-2 flex items-center justify-between">
-        <span className="font-medium">{title}</span>
-        {last !== null && (
-          <span className={`tabular-nums ${change !== null && change >= 0 ? "text-emerald-300" : "text-red-300"}`}>
-            {last.toFixed(3)}{change !== null && (
-              <span className="ml-2 text-white/60">{change >= 0 ? "+" : ""}{change.toFixed(2)}%</span>
-            )}
-          </span>
-        )}
-      </div>
-      <div className="flex-1 w-full">
+    <div className="relative overflow-hidden rounded-xl border border-white/10 bg-[#0f1418] flex-1 h-[280px]">
+      <div className="absolute inset-0 w-full h-full">
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={data} margin={{ left: 0, right: 0, top: 0, bottom: 0 }}>
             <defs>
@@ -44,11 +34,31 @@ function MiniChart({ title, series, up }: { title: string; series: SeriesPoint[]
                 <stop offset="100%" stopColor={color} stopOpacity={0.05} />
               </linearGradient>
             </defs>
-            <YAxis hide domain={[min - pad, max + pad]} />
-            <XAxis hide dataKey="x" type="number" domain={["auto", "auto"]} />
+            <YAxis hide width={0} tickLine={false} axisLine={false} domain={[min - pad, max + pad]} />
+            <XAxis
+              hide
+              height={0}
+              axisLine={false}
+              tickLine={false}
+              dataKey="x"
+              type="number"
+              domain={["dataMin", "dataMax"]}
+              padding={{ left: 0, right: 0 }}
+              allowDataOverflow
+            />
             <Area type="monotone" dataKey="y" stroke={color} fill={`url(#${safeId})`} strokeWidth={2} />
           </AreaChart>
         </ResponsiveContainer>
+      </div>
+      <div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between px-4 py-2 text-sm text-white/80 backdrop-blur-[1px]">
+        <span className="font-medium">{title}</span>
+        {last !== null && (
+          <span className={`tabular-nums ${change !== null && change >= 0 ? "text-emerald-300" : "text-red-300"}`}>
+            {last.toFixed(3)}{change !== null && (
+              <span className="ml-2 text-white/60">{change >= 0 ? "+" : ""}{change.toFixed(2)}%</span>
+            )}
+          </span>
+        )}
       </div>
     </div>
   );
@@ -125,7 +135,7 @@ export default function DashboardPage() {
         </div>
         <div className="h-px bg-white/10 my-4" />
 
-        <div className="grid grid-cols-4 gap-4 w-full">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5 w-full">
           {charts.map((name) => (
             <MiniChart
               key={name}
