@@ -195,6 +195,60 @@ For production deployment, set these in Netlify dashboard:
 NODE_ENV=production
 ```
 
+### Backend (FastAPI) + S3 Setup
+
+1) AWS prerequisites
+- Create S3 bucket (e.g. `simple-fuel-noms`) in your preferred region
+- Create an IAM user (programmatic access) with the least-privileged policy:
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": ["s3:PutObject", "s3:GetObject"],
+      "Resource": "arn:aws:s3:::YOUR_BUCKET_NAME/noms/*"
+    }
+  ]
+}
+```
+
+2) Local environment (Windows PowerShell)
+```powershell
+setx S3_BUCKET "YOUR_BUCKET_NAME"
+setx S3_PREFIX "noms/"
+setx AWS_ACCESS_KEY_ID "AKIA..."
+setx AWS_SECRET_ACCESS_KEY "..."
+setx AWS_REGION "eu-central-1"
+setx DISABLE_EMAIL "1"  # optional; keep emails off during testing
+```
+
+3) Run API locally
+```powershell
+cd api
+pip install -r requirements.txt
+python app\main.py
+```
+
+4) Expose API with ngrok
+```powershell
+ngrok http 8000
+```
+Copy the HTTPS forwarding URL and set it for the frontend:
+```powershell
+setx NEXT_PUBLIC_API_URL "https://<your-ngrok-subdomain>.ngrok.io"
+```
+Open a new terminal before running the Next.js app so the env is loaded.
+
+5) Frontend run
+```powershell
+npm run dev
+```
+
+Notes:
+- If LibreOffice is installed at a different path, set `LIBREOFFICE_PATH` accordingly; otherwise the API returns DOCX instead of PDF.
+- The API returns presigned S3 URLs (valid ~7 days). For permanent public links, use public-read objects and construct `https://{bucket}.s3.{region}.amazonaws.com/{key}`.
+
 ### 📊 Production Build
 ```bash
 npm run build

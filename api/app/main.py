@@ -5,7 +5,8 @@ import subprocess
 from typing import List
 from datetime import datetime, date, timedelta
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from email.mime.text import MIMEText
@@ -19,6 +20,12 @@ from docx.oxml.ns import qn
 
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
+try:
+    import boto3
+    from botocore.exceptions import BotoCoreError, ClientError
+except Exception:  # boto3 optional for local use
+    boto3 = None
+    BotoCoreError = ClientError = Exception
 
 # ---------------- Config ----------------
 PEN_EMAIL = os.getenv('PEN_EMAIL', 'office@pen.com')
@@ -36,15 +43,39 @@ BOTH_TEMPLATE = os.getenv('BOTH_TEMPLATE', os.path.join(BASE_DIR, 'mgo_ifo_nom_t
 LIBREOFFICE_PATH = os.getenv('LIBREOFFICE_PATH', r'C:\\Program Files\\LibreOffice\\program\\soffice.exe')
 
 
+DISABLE_EMAIL = os.getenv('DISABLE_EMAIL', '0') == '1'
+
+# S3 config (optional). If S3_BUCKET is set, generated files will be uploaded.
+S3_BUCKET = os.getenv('S3_BUCKET')
+S3_PREFIX = os.getenv('S3_PREFIX', 'noms/')
+S3_REGION = os.getenv('AWS_REGION') or os.getenv('AWS_DEFAULT_REGION') or 'us-east-1'
+
+_s3_client = None
+def get_s3_client():
+    global _s3_client
+    if not S3_BUCKET:
+        return None
+    if boto3 is None:
+        return None
+    if _s3_client is None:
+        _s3_client = boto3.client('s3', region_name=S3_REGION)
+    return _s3_client
+
 def authenticate():
+    if DISABLE_EMAIL:
+        return None
     if os.path.exists(TOKEN_FILE):
         creds = Credentials.from_authorized_user_file(TOKEN_FILE, SCOPES)
         return build('gmail', 'v1', credentials=creds)
-    raise RuntimeError('No valid credentials found. Place token.json next to the app.')
+    return None
 
 
 def send_email(recipients, subject, body, attachments=None):
     service = authenticate()
+    if service is None:
+        # Local test mode: skip sending
+        print('[LOCAL TEST] Email disabled or token missing. Skipping send.')
+        return
     message = MIMEMultipart()
     message['To'] = ', '.join(recipients)
     message['Subject'] = subject
@@ -111,6 +142,10 @@ def convert_docx_to_pdf(input_path, output_path, librepath):
     output_dir = os.path.dirname(output_path)
     os.makedirs(output_dir, exist_ok=True)
 
+    if not os.path.exists(librepath):
+        # Fallback: skip conversion in local test
+        print('[LOCAL TEST] LibreOffice not found. Returning DOCX instead of PDF.')
+        return input_path
     command = [
         librepath,
         '--headless',
@@ -118,8 +153,19 @@ def convert_docx_to_pdf(input_path, output_path, librepath):
         '--outdir', output_dir,
         input_path,
     ]
-    subprocess.run(command, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    return output_path
+    try:
+        subprocess.run(
+            command,
+            check=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=25,  # fail fast if LibreOffice hangs
+        )
+        return output_path
+    except Exception as e:
+        # On any error or timeout, fall back to returning the original DOCX path
+        print(f"[LOCAL TEST] Conversion skipped ({type(e).__name__}). Returning DOCX path.")
+        return input_path
 
 
 def delete_file(file_path):
@@ -127,8 +173,37 @@ def delete_file(file_path):
         os.remove(file_path)
 
 
+def upload_files_to_s3(file_paths):
+    client = get_s3_client()
+    if client is None:
+        return []
+    uploaded_urls = []
+    for file_path in file_paths:
+        try:
+            filename = os.path.basename(file_path)
+            key = f"{S3_PREFIX}{filename}"
+            client.upload_file(file_path, S3_BUCKET, key)
+            # Generate a presigned URL valid for 7 days
+            url = client.generate_presigned_url(
+                'get_object',
+                Params={'Bucket': S3_BUCKET, 'Key': key},
+                ExpiresIn=7 * 24 * 3600,
+            )
+            uploaded_urls.append({'key': key, 'url': url})
+        except (BotoCoreError, ClientError) as e:
+            print(f"[S3] Upload failed for {file_path}: {e}")
+    return uploaded_urls
+
+
 def process_both(vessel_name, vessel_imo, supply_dates, mgo_tons, mgo_price, ifo_tons, ifo_price, agent):
     global queued_up_files
+    # Ensure template exists; if not, build a very simple one for local test
+    if not os.path.exists(BOTH_TEMPLATE):
+        tmp = Document()
+        tmp.add_heading('Bunkering nomination (MGO + IFO)', level=1)
+        tmp.add_paragraph(f'Vessel: {vessel_name} (IMO {vessel_imo})')
+        tmp.add_paragraph(f'Date: {supply_dates}')
+        tmp.save(BOTH_TEMPLATE)
     replacements = {
         'X1_CN': str('Simple Fuel FZCO').upper(),
         'X1_VSLN': str(vessel_name).upper(),
@@ -152,13 +227,20 @@ def process_both(vessel_name, vessel_imo, supply_dates, mgo_tons, mgo_price, ifo
     replace_strings_in_docx(out_path, out_path, replacements2, 1)
     input_docx = out_path
     output_pdf = os.path.join(FINISHED_DIR, f"{replacements2['X1_RN']}.pdf")
-    convert_docx_to_pdf(input_docx, output_pdf, LIBREOFFICE_PATH)
-    delete_file(out_path)
-    queued_up_files.append(output_pdf)
+    final_path = convert_docx_to_pdf(input_docx, output_pdf, LIBREOFFICE_PATH)
+    if final_path.endswith('.pdf'):
+        delete_file(out_path)
+    queued_up_files.append(final_path)
 
 
 def process_mgo(vessel_name, vessel_imo, supply_dates, mgo_tons, mgo_price, agent):
     global queued_up_files
+    if not os.path.exists(MGO_TEMPLATE):
+        tmp = Document()
+        tmp.add_heading('Bunkering nomination (MGO)', level=1)
+        tmp.add_paragraph(f'Vessel: {vessel_name} (IMO {vessel_imo})')
+        tmp.add_paragraph(f'Date: {supply_dates}')
+        tmp.save(MGO_TEMPLATE)
     replacements = {
         'X1_CN': str('Simple Fuel FZCO').upper(),
         'X1_VSLN': str(vessel_name).upper(),
@@ -180,13 +262,20 @@ def process_mgo(vessel_name, vessel_imo, supply_dates, mgo_tons, mgo_price, agen
     replace_strings_in_docx(out_path, out_path, replacements2, 1)
     input_docx = out_path
     output_pdf = os.path.join(FINISHED_DIR, f"{replacements2['X1_RN']}.pdf")
-    convert_docx_to_pdf(input_docx, output_pdf, LIBREOFFICE_PATH)
-    delete_file(out_path)
-    queued_up_files.append(output_pdf)
+    final_path = convert_docx_to_pdf(input_docx, output_pdf, LIBREOFFICE_PATH)
+    if final_path.endswith('.pdf'):
+        delete_file(out_path)
+    queued_up_files.append(final_path)
 
 
 def process_ifo(vessel_name, vessel_imo, supply_dates, ifo_tons, ifo_price, agent):
     global queued_up_files
+    if not os.path.exists(IFO_TEMPLATE):
+        tmp = Document()
+        tmp.add_heading('Bunkering nomination (IFO)', level=1)
+        tmp.add_paragraph(f'Vessel: {vessel_name} (IMO {vessel_imo})')
+        tmp.add_paragraph(f'Date: {supply_dates}')
+        tmp.save(IFO_TEMPLATE)
     replacements = {
         'X1_CN': str('Simple Fuel FZCO').upper(),
         'X1_VSLN': str(vessel_name).upper(),
@@ -208,24 +297,34 @@ def process_ifo(vessel_name, vessel_imo, supply_dates, ifo_tons, ifo_price, agen
     replace_strings_in_docx(out_path, out_path, replacements2, 1)
     input_docx = out_path
     output_pdf = os.path.join(FINISHED_DIR, f"{replacements2['X1_RN']}.pdf")
-    convert_docx_to_pdf(input_docx, output_pdf, LIBREOFFICE_PATH)
-    delete_file(out_path)
-    queued_up_files.append(output_pdf)
+    final_path = convert_docx_to_pdf(input_docx, output_pdf, LIBREOFFICE_PATH)
+    if final_path.endswith('.pdf'):
+        delete_file(out_path)
+    queued_up_files.append(final_path)
 
 
 app = FastAPI()
 
+# CORS for local dev (Next.js at http://localhost:3000 etc.)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 class get_nom_info(BaseModel):
-    vessel_name: str
-    vessel_imo: int
-    vessel_port: str
-    mgo_tons: str
-    mgo_price: float
-    ifo_tons: str
-    ifo_price: float
-    vessel_supply_date: str
-    vessel_trader: str
-    vessel_agent: str
+    vessel_name: str | None = ""
+    vessel_imo: int | None = 0
+    vessel_port: str | None = ""
+    mgo_tons: str | None = "0"
+    mgo_price: float | None = 0.0
+    ifo_tons: str | None = "0"
+    ifo_price: float | None = 0.0
+    vessel_supply_date: str | None = ""
+    vessel_trader: str | None = ""
+    vessel_agent: str | None = ""
 
 
 @app.get('/')
@@ -275,23 +374,34 @@ def process_noms(full_vessel_data):
     fetched_email_subject = f"NOMINATION FOR VESSEL: {full_vessel_data['vessel_name']} (IMO: {full_vessel_data['vessel_imo']})"
     send_email(recipients=[PEN_EMAIL], subject=fetched_email_subject, body=fetched_email_body, attachments=queued_up_files)
 
+    s3_files = upload_files_to_s3(queued_up_files)
+    return {
+        'local_files': queued_up_files,
+        's3_files': s3_files,
+    }
+
 
 @app.post('/endpoint1')
-def endpoint1(item: get_nom_info):
+async def endpoint1(request: Request):
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    # Coerce and default values so the endpoint is forgiving during local tests
     nomination_data = {
-        'vessel_name': str(item.vessel_name),
-        'vessel_imo': int(item.vessel_imo),
-        'vessel_port': str(item.vessel_port),
-        'mgo_tons': str(item.mgo_tons),
-        'mgo_price': float(item.mgo_price),
-        'ifo_tons': str(item.ifo_tons),
-        'ifo_price': float(item.ifo_price),
-        'vessel_supply_date': str(item.vessel_supply_date),
-        'vessel_trader': str(item.vessel_trader),
-        'vessel_agent': str(item.vessel_agent),
+        'vessel_name': str(body.get('vessel_name') or ''),
+        'vessel_imo': int(body.get('vessel_imo') or 0),
+        'vessel_port': str(body.get('vessel_port') or ''),
+        'mgo_tons': str(body.get('mgo_tons') or '0'),
+        'mgo_price': float(body.get('mgo_price') or 0),
+        'ifo_tons': str(body.get('ifo_tons') or '0'),
+        'ifo_price': float(body.get('ifo_price') or 0),
+        'vessel_supply_date': str(body.get('vessel_supply_date') or ''),
+        'vessel_trader': str(body.get('vessel_trader') or ''),
+        'vessel_agent': str(body.get('vessel_agent') or ''),
     }
-    process_noms(nomination_data)
-    return {'ok': True}
+    result = process_noms(nomination_data)
+    return {'ok': True, 'received': nomination_data, 'files': result.get('s3_files') or []}
 
 
 if __name__ == '__main__':

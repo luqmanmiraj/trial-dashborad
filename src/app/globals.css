@@ -42,20 +42,3 @@ input:hover {
 form:hover {
   box-shadow: 0 0 80px rgba(16, 185, 129, 0.2), 0 0 120px rgba(59, 130, 246, 0.1);
 }
-
-/* Make native date input calendar icon white on dark backgrounds */
-input[type="date"] {
-  color-scheme: dark;
-  /* Custom white calendar icon */
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='4' width='18' height='18' rx='2' ry='2'/%3E%3Cline x1='16' y1='2' x2='16' y2='6'/%3E%3Cline x1='8' y1='2' x2='8' y2='6'/%3E%3Cline x1='3' y1='10' x2='21' y2='10'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 10px center;
-  background-size: 18px 18px;
-  padding-right: 38px; /* room for icon */
-}
-
-/* Keep native indicator clickable; we also open via showPicker() */
-input[type="date"]::-webkit-calendar-picker-indicator {
-  opacity: 0; /* visually hidden */
-  pointer-events: auto; /* allow clicks */
-}

@@ -254,6 +254,7 @@ export default function DashboardPage() {
   const { data } = useSWR<PriceResp>("/api/prices", fetcher, { refreshInterval: 60_000 });
   const router = useRouter();
   const [now, setNow] = useState<Date>(new Date());
+  const [sidebarExpanded, setSidebarExpanded] = useState(false);
   const [showForm, setShowForm] = useState<boolean>(false);
 
   useEffect(() => {
@@ -271,16 +272,23 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen bg-[#0b0f12] text-white flex">
       {/* Left navigation */}
-      <aside className="w-16 sm:w-20 bg-[#0a0e11] border-r border-white/10 flex flex-col items-center py-4 gap-3">
+      <aside 
+        className={`${sidebarExpanded ? 'w-48' : 'w-16 sm:w-20'} bg-[#0a0e11] border-r border-white/10 flex flex-col items-center py-4 gap-3 transition-all duration-300 ease-in-out relative group`}
+        onMouseEnter={() => setSidebarExpanded(true)}
+        onMouseLeave={() => setSidebarExpanded(false)}
+      >
         <div className="w-8 h-8 rounded-lg bg-emerald-400/20 border border-emerald-400/40" />
         {Array.from({ length: 10 }).map((_, i) => (
-          <div key={i} className="w-8 h-8 rounded-md bg-white/5 border border-white/10" />
+          <div 
+            key={i} 
+            className={`w-8 h-8 rounded-md bg-white/5 border border-white/10 transition-all duration-200 ${sidebarExpanded ? 'hover:bg-white/10 hover:scale-105' : ''}`}
+          />
         ))}
         {/* Bottom icons: user and settings */}
         <div className="mt-auto flex flex-col items-center gap-3 pb-1">
           <button
             aria-label="Account"
-            className="w-9 h-9 rounded-md bg-white/5 border border-white/10 hover:bg-white/10 grid place-items-center"
+            className="w-9 h-9 rounded-md bg-white/5 border border-white/10 hover:bg-white/10 grid place-items-center transition-all duration-200 hover:scale-105"
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" strokeWidth="1.5">
               <circle cx="12" cy="8" r="3" />
@@ -289,7 +297,7 @@ export default function DashboardPage() {
           </button>
           <button
             aria-label="Settings"
-            className="w-9 h-9 rounded-md bg-white/5 border border-white/10 hover:bg-white/10 grid place-items-center"
+            className="w-9 h-9 rounded-md bg-white/5 border border-white/10 hover:bg-white/10 grid place-items-center transition-all duration-200 hover:scale-105"
             onClick={logout}
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" strokeWidth="1.5">
@@ -298,6 +306,11 @@ export default function DashboardPage() {
             </svg>
           </button>
         </div>
+        
+        {/* Interactive overlay with subtle glow effect */}
+        {sidebarExpanded && (
+          <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/5 to-blue-500/5 rounded-lg opacity-0 animate-fadeIn pointer-events-none" />
+        )}
       </aside>
 
       {/* Main content */}
