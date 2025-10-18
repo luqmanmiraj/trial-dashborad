@@ -81,6 +81,8 @@ function NominationForm({ onClose }: { onClose: () => void }) {
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const dateRef = useRef<HTMLInputElement | null>(null);
+  const [useMgo, setUseMgo] = useState(true);
+  const [useIfo, setUseIfo] = useState(false);
   const [form, setForm] = useState<NominationFormData>({
     vessel_name: "",
     vessel_imo: "",
@@ -131,7 +133,8 @@ function NominationForm({ onClose }: { onClose: () => void }) {
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      setMessage(`Generated: ${data?.pdf || "success"}`);
+      const firstUrl = data?.files?.[0]?.url;
+      setMessage(firstUrl ? `File: ${firstUrl}` : `Generated successfully`);
     } catch (err: any) {
       setMessage(`Error: ${err?.message || "failed"}`);
     } finally {
@@ -142,12 +145,13 @@ function NominationForm({ onClose }: { onClose: () => void }) {
   const input = (
     name: keyof NominationFormData,
     label: string,
-    props?: React.InputHTMLAttributes<HTMLInputElement>
+    props?: React.InputHTMLAttributes<HTMLInputElement>,
+    wrapperClass?: string
   ) => (
-    <label className="grid gap-1">
+    <label className={`grid gap-1 ${wrapperClass || ""}`}>
       <span className="text-sm text-white/70">{label}</span>
       <input
-        className="bg-white/5 border border-white/10 rounded-md px-3 py-2 outline-none focus:border-emerald-400/50"
+        className="bg-white/5 border border-white/10 rounded-lg px-3 py-2 outline-none focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-400/20 transition"
         value={form[name]}
         onChange={(e) => update(name, e.target.value)}
         {...props}
@@ -156,23 +160,24 @@ function NominationForm({ onClose }: { onClose: () => void }) {
   );
 
   return (
-    <form onSubmit={submit} className="rounded-xl border border-white/10 bg-[#0f1418] p-4 grid gap-3">
+    <form onSubmit={submit} className="rounded-2xl border border-white/10 bg-gradient-to-b from-[#11171c] to-[#0c1115] p-5 grid gap-4 shadow-[0_10px_40px_rgba(0,0,0,0.35)] max-w-5xl mx-auto">
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-medium">Generate nomination</h3>
+        <h3 className="text-xl font-semibold tracking-wide">Generate nomination</h3>
         <button type="button" className="text-white/60 hover:text-white" onClick={onClose}>Close</button>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      {/* Essentials */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
         {input("vessel_name", "Vessel name")}
-        {input("vessel_imo", "Vessel IMO", { inputMode: "numeric" })}
+        {input("vessel_imo", "Vessel IMO", { inputMode: "numeric", placeholder: "e.g. 9876543" })}
         {input("vessel_port", "Port")}
-        {/* Date field with explicit trigger to ensure picker opens */}
+        {/* Date */}
         <label className="grid gap-1">
           <span className="text-sm text-white/70">Supply date</span>
           <div className="relative">
             <input
               ref={dateRef}
               type="date"
-              className="bg-white/5 border border-white/10 rounded-md pl-3 pr-10 py-2 w-full outline-none focus:border-emerald-400/50"
+              className="bg-white/5 border border-white/10 rounded-lg pl-3 pr-10 py-2 w-full outline-none focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-400/20 transition"
               value={form.vessel_supply_date}
               onChange={(e) => update("vessel_supply_date", e.target.value)}
               style={{ backgroundImage: "none" }}
@@ -180,10 +185,7 @@ function NominationForm({ onClose }: { onClose: () => void }) {
             <button
               type="button"
               className="absolute right-2 top-1/2 -translate-y-1/2 text-white/80 hover:text-white"
-              onMouseDown={(e) => {
-                e.preventDefault();
-                try { (dateRef.current as any)?.showPicker?.(); } catch {}
-              }}
+              onMouseDown={(e) => { e.preventDefault(); try { (dateRef.current as any)?.showPicker?.(); } catch {} }}
               aria-label="Open calendar"
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -195,18 +197,54 @@ function NominationForm({ onClose }: { onClose: () => void }) {
             </button>
           </div>
         </label>
-        {input("mgo_tons", "MGO tons", { inputMode: "numeric" })}
-        {input("mgo_price", "MGO price", { inputMode: "decimal" })}
-        {input("ifo_tons", "IFO tons", { inputMode: "numeric" })}
-        {input("ifo_price", "IFO price", { inputMode: "decimal" })}
-        {input("vessel_trader", "Trader")}
-        {input("vessel_agent", "Agent")}
       </div>
-      <div className="flex items-center gap-3">
-        <button disabled={submitting} className="px-4 py-2 rounded-md bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50">
+
+      {/* Product toggles */}
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-sm text-white/60">Products:</span>
+        <button type="button" onClick={() => setUseMgo(v => !v)} className={`px-2.5 py-1 rounded-full text-xs border ${useMgo ? "bg-emerald-600/20 border-emerald-500 text-emerald-300" : "bg-white/5 border-white/15 text-white/70"}`}>MGO</button>
+        <button type="button" onClick={() => setUseIfo(v => !v)} className={`px-2.5 py-1 rounded-full text-xs border ${useIfo ? "bg-emerald-600/20 border-emerald-500 text-emerald-300" : "bg-white/5 border-white/15 text-white/70"}`}>IFO</button>
+      </div>
+
+      {/* Conditional product fields */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+        {useMgo && (
+          <>
+            {input("mgo_tons", "MGO tons", { inputMode: "numeric", placeholder: "e.g. 120" })}
+            {input("mgo_price", "MGO price", { inputMode: "decimal", placeholder: "e.g. 535.00" })}
+          </>
+        )}
+        {useIfo && (
+          <>
+            {input("ifo_tons", "IFO tons", { inputMode: "numeric", placeholder: "e.g. 180" })}
+            {input("ifo_price", "IFO price", { inputMode: "decimal", placeholder: "e.g. 505.00" })}
+          </>
+        )}
+      </div>
+
+      {/* Optional */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+        {input("vessel_trader", "Trader (optional)")}
+        {input("vessel_agent", "Agent (optional)")}
+        <div className="hidden md:block" />
+        <div className="hidden md:block" />
+      </div>
+
+      <div className="flex items-center gap-3 justify-end">
+        <button disabled={submitting} className="px-6 py-2.5 rounded-lg bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 disabled:opacity-50 shadow-[0_8px_30px_rgba(16,185,129,0.25)] transition font-medium">
           {submitting ? "Generating…" : "Generate & email"}
         </button>
-        {message && <span className="text-sm text-white/70">{message}</span>}
+        {message && (
+          <span className="text-sm text-white/70 truncate max-w-[60ch]">
+            {/^https?:\/\//.test(message.replace(/^File: /, "")) ? (
+              <a className="underline hover:text-emerald-300" href={message.replace(/^File: /, "")} target="_blank" rel="noreferrer">
+                Download file
+              </a>
+            ) : (
+              message
+            )}
+          </span>
+        )}
       </div>
     </form>
   );
