@@ -25,8 +25,8 @@ function MiniChart({ title, series, up }: { title: string; series: SeriesPoint[]
 
   return (
     <div className="relative overflow-hidden rounded-xl border border-white/10 bg-[#0f1418] flex-1 h-[280px] select-none outline-none focus:outline-none" tabIndex={-1}>
-      {/* Text header - reserved space */}
-      <div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between px-4 py-2 text-sm text-white/80 bg-gradient-to-b from-[#0f1418] to-transparent pointer-events-none">
+      {/* Text header - reserved space with bottom border */}
+      <div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between px-4 py-2 text-sm text-white/80 bg-[#0f1418] border-b border-white/10 pointer-events-none">
         <span className="font-medium">{title}</span>
         {last !== null && (
           <span className={`tabular-nums ${change !== null && change >= 0 ? "text-emerald-300" : "text-red-300"}`}>
@@ -36,7 +36,7 @@ function MiniChart({ title, series, up }: { title: string; series: SeriesPoint[]
           </span>
         )}
       </div>
-      {/* Chart area - starts below header */}
+      {/* Chart area - starts below header line */}
       <div className="absolute top-10 left-0 right-0 bottom-0 w-full pointer-events-none">
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={data} margin={{ left: 0, right: 0, top: 0, bottom: 0 }}>
