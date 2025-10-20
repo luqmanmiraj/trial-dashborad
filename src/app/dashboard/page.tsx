@@ -411,6 +411,7 @@ function FinalNominationForm({ onClose }: { onClose: () => void }) {
 function NominationForm({ onClose }: { onClose: () => void }) {
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [lookingUp, setLookingUp] = useState(false);
   const dateRef = useRef<HTMLInputElement | null>(null);
   const [productType, setProductType] = useState<"MGO" | "IFO" | "BOTH">("BOTH");
   const [form, setForm] = useState<NominationFormData>({
@@ -433,6 +434,30 @@ function NominationForm({ onClose }: { onClose: () => void }) {
   const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
   const update = (k: keyof NominationFormData, v: string) => setForm((f) => ({ ...f, [k]: v }));
+
+  const lookupVessel = async () => {
+    if (!form.vessel_imo) {
+      setMessage("Please enter an IMO number first");
+      return;
+    }
+    setLookingUp(true);
+    setMessage(null);
+    try {
+      const res = await fetch(`/api/vessel-lookup?imo=${form.vessel_imo}`);
+      if (!res.ok) throw new Error("Vessel not found");
+      const data = await res.json();
+      setForm((f) => ({
+        ...f,
+        vessel_name: data.vessel_name || f.vessel_name,
+        vessel_flag: data.vessel_flag || f.vessel_flag,
+      }));
+      setMessage(`Found: ${data.vessel_name} (${data.vessel_flag})`);
+    } catch (err: any) {
+      setMessage(`Error: ${err?.message || "failed to lookup vessel"}`);
+    } finally {
+      setLookingUp(false);
+    }
+  };
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -502,7 +527,26 @@ function NominationForm({ onClose }: { onClose: () => void }) {
       {/* Vessel Details */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         {input("vessel_name", "Vessel name")}
-        {input("vessel_imo", "Vessel IMO", { inputMode: "numeric", placeholder: "e.g. 9876543" })}
+        <label className="grid gap-1">
+          <span className="text-sm text-white/70">Vessel IMO</span>
+          <div className="flex gap-2">
+            <input
+              className="bg-white/5 border border-white/10 rounded-lg px-3 py-2 outline-none focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-400/20 transition flex-1"
+              value={form.vessel_imo}
+              onChange={(e) => update("vessel_imo", e.target.value)}
+              inputMode="numeric"
+              placeholder="e.g. 9876543"
+            />
+            <button
+              type="button"
+              onClick={lookupVessel}
+              disabled={lookingUp || !form.vessel_imo}
+              className="px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium transition whitespace-nowrap"
+            >
+              {lookingUp ? "..." : "Lookup"}
+            </button>
+          </div>
+        </label>
         {input("vessel_flag", "Vessel flag", { placeholder: "e.g. Panama" })}
       </div>
 
