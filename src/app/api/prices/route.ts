@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 
 // We'll use Yahoo finance chart endpoint (unofficial) via fetch to avoid requiring Node >=20 for yahoo-finance2
-// Symbols mapping: BRNT -> BZ=F, WTI -> CL=F, NG -> NG=F, EUR/USD -> EURUSD=X
+// Symbols mapping: BRNT -> BZ=F, WTI -> CL=F, NG -> NG=F, USD/RUB -> RUB=X
 const SYMBOLS: Record<string, string> = {
   BRNT: "BZ=F",
   WTI: "CL=F",
   NG: "NG=F",
-  "EUR/USD": "EURUSD=X",
+  "USD/RUB": "RUB=X",
 };
 
 type Point = { t: number; c: number };

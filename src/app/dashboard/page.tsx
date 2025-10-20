@@ -412,8 +412,7 @@ function NominationForm({ onClose }: { onClose: () => void }) {
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const dateRef = useRef<HTMLInputElement | null>(null);
-  const [useMgo, setUseMgo] = useState(true);
-  const [useIfo, setUseIfo] = useState(false);
+  const [productType, setProductType] = useState<"MGO" | "IFO" | "BOTH">("BOTH");
   const [form, setForm] = useState<NominationFormData>({
     vessel_name: "",
     vessel_imo: "",
@@ -515,36 +514,37 @@ function NominationForm({ onClose }: { onClose: () => void }) {
         </label>
         <label className="grid gap-1">
           <span className="text-sm text-white/70">Supply date (DD.MM.YYYY)</span>
-          <input
+            <input
             type="text"
             className="bg-white/5 border border-white/10 rounded-lg px-3 py-2 outline-none focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-400/20 transition"
-            value={form.vessel_supply_date}
-            onChange={(e) => update("vessel_supply_date", e.target.value)}
+              value={form.vessel_supply_date}
+              onChange={(e) => update("vessel_supply_date", e.target.value)}
             placeholder="DD.MM.YYYY"
           />
         </label>
         {input("bdn_numbers", "BDN numbers", { placeholder: "e.g. 2807/01,2807/02" })}
       </div>
 
-      {/* Product toggles */}
+      {/* Product selector */}
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-sm text-white/60">Products:</span>
-        <button type="button" onClick={() => setUseMgo(v => !v)} className={`px-2.5 py-1 rounded-full text-xs border ${useMgo ? "bg-emerald-600/20 border-emerald-500 text-emerald-300" : "bg-white/5 border-white/15 text-white/70"}`}>MGO</button>
-        <button type="button" onClick={() => setUseIfo(v => !v)} className={`px-2.5 py-1 rounded-full text-xs border ${useIfo ? "bg-emerald-600/20 border-emerald-500 text-emerald-300" : "bg-white/5 border-white/15 text-white/70"}`}>IFO</button>
+        <button type="button" onClick={() => setProductType("MGO")} className={`px-2.5 py-1 rounded-full text-xs border transition ${productType === "MGO" ? "bg-emerald-600/20 border-emerald-500 text-emerald-300" : "bg-white/5 border-white/15 text-white/70"}`}>MGO</button>
+        <button type="button" onClick={() => setProductType("IFO")} className={`px-2.5 py-1 rounded-full text-xs border transition ${productType === "IFO" ? "bg-emerald-600/20 border-emerald-500 text-emerald-300" : "bg-white/5 border-white/15 text-white/70"}`}>IFO</button>
+        <button type="button" onClick={() => setProductType("BOTH")} className={`px-2.5 py-1 rounded-full text-xs border transition ${productType === "BOTH" ? "bg-emerald-600/20 border-emerald-500 text-emerald-300" : "bg-white/5 border-white/15 text-white/70"}`}>Both</button>
       </div>
 
       {/* Conditional product fields */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-        {useMgo && (
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {(productType === "MGO" || productType === "BOTH") && (
           <>
             {input("mgo_tons", "MGO tons", { inputMode: "numeric", placeholder: "e.g. 120" })}
-            {input("mgo_price", "MGO price", { inputMode: "decimal", placeholder: "e.g. 535.00" })}
+            {input("mgo_price", "MGO price (USD/mt)", { inputMode: "decimal", placeholder: "e.g. 535.00" })}
           </>
         )}
-        {useIfo && (
+        {(productType === "IFO" || productType === "BOTH") && (
           <>
             {input("ifo_tons", "IFO tons", { inputMode: "numeric", placeholder: "e.g. 180" })}
-            {input("ifo_price", "IFO price", { inputMode: "decimal", placeholder: "e.g. 505.00" })}
+            {input("ifo_price", "IFO price (USD/mt)", { inputMode: "decimal", placeholder: "e.g. 505.00" })}
           </>
         )}
       </div>
@@ -553,6 +553,24 @@ function NominationForm({ onClose }: { onClose: () => void }) {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         {input("vessel_trader", "Trader")}
         {input("vessel_agent", "Agent")}
+      </div>
+
+      {/* Currency and Exchange Rate */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        <label className="grid gap-1">
+          <span className="text-sm text-white/70">Currency</span>
+          <select
+            className="bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-400/20 transition text-white"
+            value={form.currency}
+            onChange={(e) => update("currency", e.target.value)}
+          >
+            <option value="USD" className="bg-[#1a1f24] text-white">USD</option>
+            <option value="AED" className="bg-[#1a1f24] text-white">AED</option>
+            <option value="EUR" className="bg-[#1a1f24] text-white">EUR</option>
+            <option value="BHD" className="bg-[#1a1f24] text-white">BHD</option>
+          </select>
+        </label>
+        {input("exchange_rate", "Exchange rate to USD", { inputMode: "decimal", placeholder: "e.g. 3.6725" })}
       </div>
 
       <div className="flex items-center gap-3 justify-end">
@@ -685,9 +703,9 @@ export default function DashboardPage() {
 
         <div className="h-px bg-white/10 my-6" />
 
-        <div className="flex flex-col lg:flex-row items-stretch">
+        <div className="flex flex-col lg:flex-row items-stretch gap-0">
           {/* Buttons section */}
-          <div className="grid gap-3 w-full lg:w-[280px] flex-shrink-0">
+          <div className="grid gap-3 w-full lg:w-[280px] flex-shrink-0 lg:pr-5">
             {["Initiate new request", "Generate first nomination", "Generate final nomination", "Generate invoice", "Record trade"].map(
               (label) => (
                 <button
@@ -708,10 +726,10 @@ export default function DashboardPage() {
           </div>
           
           {/* Vertical divider */}
-          <div className="hidden lg:block w-px bg-white/10 mx-5 self-stretch" />
+          <div className="hidden lg:block w-px bg-white/10 self-stretch" />
           
           {/* Form section */}
-          <div className="flex-1 mt-4 lg:mt-0">
+          <div className="flex-1 mt-4 lg:mt-0 lg:pl-5">
             {activeForm === "Initiate new request" ? (
               <InitialRequestForm onClose={() => setActiveForm(null)} />
             ) : activeForm === "Generate first nomination" ? (
