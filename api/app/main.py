@@ -450,35 +450,35 @@ class InvoiceData(BaseModel):
 
 
 def determine_bank(dict_):
-    """Determine bank details based on currency - matches original script"""
+    """Determine bank details based on currency - matches temp_file2.ipynb exactly"""
     if dict_.get('X1_UC') == 'AED':
-        bank_name = 'ITHMAAR BANK B.S.C.'
-        bank_account_number = 1000000000001
-        bank_account_iban = 'DH00000000000000001'
-        bank_swift_code = 'DXBAAAXXX'
+        bank_name = 'Bank of Dubai'
+        bank_account_number = 10000000000001
+        bank_acccount_iban = 'AE10000000000001'
+        bank_swift_code = 'AEDABUXXX'
     elif dict_.get('X1_UC') == 'USD':
         bank_name = 'Bank of Dubai'
-        bank_account_number = 1000000000002
-        bank_account_iban = 'DH00000000000000002'
-        bank_swift_code = 'DXBAAAXXY'
+        bank_account_number = 10000000000002
+        bank_acccount_iban = 'AE10000000000002'
+        bank_swift_code = 'AEDABUXXX'
     elif dict_.get('X1_UC') == 'EUR':
         bank_name = 'Bank of Dubai'
-        bank_account_number = 1000000000003
-        bank_account_iban = 'DH00000000000000003'
-        bank_swift_code = 'DXBAAAXXZ'
+        bank_account_number = 10000000000003
+        bank_acccount_iban = 'AE10000000000003'
+        bank_swift_code = 'AEDABUXXX'
     elif dict_.get('X1_UC') == 'BHD':
         bank_name = 'Bank of Dubai'
-        bank_account_number = 1000000000004
-        bank_account_iban = 'DH00000000000000004'
-        bank_swift_code = 'DXBAAAXYY'
+        bank_account_number = 10000000000004
+        bank_acccount_iban = 'AE10000000000004'
+        bank_swift_code = 'AEDABUXXX'
     else:
         # Default to USD
         bank_name = 'Bank of Dubai'
-        bank_account_number = 1000000000002
-        bank_account_iban = 'DH00000000000000002'
-        bank_swift_code = 'DXBAAAXXY'
+        bank_account_number = 10000000000002
+        bank_acccount_iban = 'AE10000000000002'
+        bank_swift_code = 'AEDABUXXX'
     
-    return [bank_name, bank_account_number, bank_account_iban, bank_swift_code]
+    return [bank_name, bank_account_number, bank_acccount_iban, bank_swift_code]
 
 
 @app.post('/generate-invoice')
@@ -527,28 +527,41 @@ async def generate_invoice(invoice_data: InvoiceData):
             replacements['X1_IQ'] = float(invoice_data.ifo_tons)
             replacements['X1_IP'] = invoice_data.ifo_price
         
-        # Calculate totals (matches notebook logic)
+        # Calculate totals - exactly as in notebook
         mgo_total = float(invoice_data.mgo_tons or 0) * invoice_data.mgo_price * invoice_data.exchange_rate if has_mgo else 0
         ifo_total = float(invoice_data.ifo_tons or 0) * invoice_data.ifo_price * invoice_data.exchange_rate if has_ifo else 0
         total = mgo_total + ifo_total
         
-        # Second replacements - calculated values (matches notebook)
+        # Second replacements - calculated values (matches notebook exactly)
         supply_date_obj = get_bunker_date(invoice_data.supply_date)
         payment_deadline = supply_date_obj + timedelta(days=10)
         
         replacements2 = {
             'X1_VSLF': str(invoice_data.vessel_flag).upper(),
-            'X1_TOTAL': f"{total:,.2f}",
             'X1_PYMTD': payment_deadline,
             'X1_DATE': supply_date_obj,
-            'X1_RN': supply_date_obj.strftime("%Y%m%d") + '-B-' + str(invoice_data.vessel_name).replace(' ', '_'),
-            'X1_SBTTL': f"{total:,.2f}",
+            'X1_RN': supply_date_obj.strftime("%Y%m%d") + '-B-' + str(invoice_data.vessel_name).replace(' ', '_').upper(),
         }
         
-        if has_mgo:
+        # Add totals based on product type
+        if has_mgo and has_ifo:
+            # Both products - matches notebook "Both IFO and MGO" section
+            replacements2['X1_TOTAL'] = f"{total:,.2f}"
             replacements2['X1_MGOT'] = f"{mgo_total:,.2f}"
-        if has_ifo:
             replacements2['X1_IFOT'] = f"{ifo_total:,.2f}"
+            replacements2['X1_SBTTL'] = f"{total:,.2f}"
+        elif has_mgo:
+            # MGO only - matches notebook "only MGO" section
+            replacements2['X1_TOTAL'] = f"{mgo_total:,.2f}"
+            replacements2['X1_MGOT'] = f"{mgo_total:,.2f}"
+            replacements2['X1_SBTTL'] = f"{mgo_total:,.2f}"
+        elif has_ifo:
+            # IFO only - matches notebook "only IFO" section
+            # Note: Original script has bug - calculates with MQ/MP which don't exist
+            # Fixed to use IFO values only
+            replacements2['X1_TOTAL'] = f"{ifo_total:,.2f}"
+            replacements2['X1_IFOT'] = f"{ifo_total:,.2f}"
+            replacements2['X1_SBTTL'] = f"{ifo_total:,.2f}"
             
         # Bank details
         bank = determine_bank(replacements)
