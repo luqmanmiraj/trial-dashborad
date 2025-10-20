@@ -402,24 +402,32 @@ def process_noms(full_vessel_data):
 
 
 @app.post('/endpoint1')
-async def endpoint1(request: Request):
-    try:
-        body = await request.json()
-    except Exception:
-        body = {}
-    # Coerce and default values so the endpoint is forgiving during local tests
+async def endpoint1(item: get_nom_info):
+    vessel_name = str(item.vessel_name)
+    vessel_imo = int(item.vessel_imo)
+    vessel_port = str(item.vessel_port)
+    mgo_tons = str(item.mgo_tons)
+    mgo_price = float(item.mgo_price)
+    ifo_tons = str(item.ifo_tons)
+    ifo_price = float(item.ifo_price)
+    vessel_supply_date = str(item.vessel_supply_date)
+    vessel_trader = str(item.vessel_trader)
+    vessel_agent = str(item.vessel_agent)
+
     nomination_data = {
-        'vessel_name': str(body.get('vessel_name') or ''),
-        'vessel_imo': int(body.get('vessel_imo') or 0),
-        'vessel_port': str(body.get('vessel_port') or ''),
-        'mgo_tons': str(body.get('mgo_tons') or '0'),
-        'mgo_price': float(body.get('mgo_price') or 0),
-        'ifo_tons': str(body.get('ifo_tons') or '0'),
-        'ifo_price': float(body.get('ifo_price') or 0),
-        'vessel_supply_date': str(body.get('vessel_supply_date') or ''),
-        'vessel_trader': str(body.get('vessel_trader') or ''),
-        'vessel_agent': str(body.get('vessel_agent') or ''),
+        'vessel_name': vessel_name,
+        'vessel_imo': vessel_imo,
+        'vessel_port': vessel_port,
+        'mgo_tons': mgo_tons,
+        'mgo_price': mgo_price,
+        'ifo_tons': ifo_tons,
+        'ifo_price': ifo_price,
+        'vessel_supply_date': vessel_supply_date,
+        'vessel_trader': vessel_trader,
+        'vessel_agent': vessel_agent
     }
+
+    print(nomination_data)
     result = process_noms(nomination_data)
     return {'ok': True, 'received': nomination_data, 'files': result.get('s3_files') or [], 'local_files': result.get('local_files') or []}
 
