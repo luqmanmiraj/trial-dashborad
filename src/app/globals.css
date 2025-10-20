@@ -29,7 +29,4 @@ body {
   animation: shake 0.5s ease-in-out;
 }
 
-/* Smooth focus transitions */
-input:focus {
-  transform: scale(1.02);
-}
+/* Removed focus scale effect for cleaner UI */

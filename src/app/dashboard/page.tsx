@@ -64,6 +64,32 @@ function MiniChart({ title, series, up }: { title: string; series: SeriesPoint[]
   );
 }
 
+type InitialRequestData = {
+  vessel_name: string;
+  mgo_tons: string;
+  ifo_tons: string;
+  bunker_date_start: string;
+  bunker_date_end: string;
+  port: string;
+  agent_name: string;
+  full_order_text: string;
+};
+
+type FirstNominationData = {
+  vessel_name: string;
+  vessel_imo: string;
+  vessel_flag: string;
+};
+
+type FinalNominationData = {
+  vessel_name: string;
+  actual_mgo_tons: string;
+  mgo_price: string;
+  actual_ifo_tons: string;
+  ifo_price: string;
+  bunker_date: string;
+};
+
 type NominationFormData = {
   vessel_name: string;
   vessel_imo: string;
@@ -80,7 +106,8 @@ type NominationFormData = {
 const PORTS = [
   "Singapore", "Rotterdam", "Fujairah", "Gibraltar", "Houston", "Antwerp",
   "Panama", "Las Palmas", "Piraeus", "Algeciras", "Zhoushan", "Busan",
-  "Istanbul", "Port Said", "Colombo", "Hong Kong", "Dubai", "Jebel Ali"
+  "Istanbul", "Port Said", "Colombo", "Hong Kong", "Dubai", "Jebel Ali",
+  "Saint-Petersburg", "Ust-Luga", "Bronca", "Kronshstadt", "Primorsk", "InterFerum"
 ];
 
 function PortDropdown({ value, onChange }: { value: string; onChange: (val: string) => void }) {
@@ -102,7 +129,7 @@ function PortDropdown({ value, onChange }: { value: string; onChange: (val: stri
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 outline-none focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-400/20 transition text-white text-left flex items-center justify-between"
+        className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm outline-none focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-400/20 transition text-white text-left flex items-center justify-between"
       >
         <span className={value ? "text-white" : "text-white/50"}>{value || "Select port"}</span>
         <svg
@@ -142,6 +169,236 @@ function PortDropdown({ value, onChange }: { value: string; onChange: (val: stri
         </div>
       )}
     </div>
+  );
+}
+
+// Initial Request Form
+function InitialRequestForm({ onClose }: { onClose: () => void }) {
+  const [submitting, setSubmitting] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const [form, setForm] = useState<InitialRequestData>({
+    vessel_name: "",
+    mgo_tons: "",
+    ifo_tons: "",
+    bunker_date_start: "",
+    bunker_date_end: "",
+    port: "",
+    agent_name: "",
+    full_order_text: "",
+  });
+
+  const update = (k: keyof InitialRequestData, v: string) => setForm((f) => ({ ...f, [k]: v }));
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+    setMessage(null);
+    try {
+      // Implement API call for initial request
+      setMessage("Initial request submitted successfully");
+    } catch (err: any) {
+      setMessage(`Error: ${err?.message || "failed"}`);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <form onSubmit={submit} className="rounded-2xl border border-white/10 bg-gradient-to-b from-[#11171c] to-[#0c1115] p-5 grid gap-3 max-w-4xl">
+      <div className="flex items-center justify-between">
+        <h3 className="text-xl font-semibold tracking-wide">Initiate new request</h3>
+        <button type="button" className="text-white/60" onClick={onClose}>Close</button>
+      </div>
+      
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        <label className="grid gap-1">
+          <span className="text-sm text-white/70">Vessel Name</span>
+          <input className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm outline-none focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-400/20 transition" value={form.vessel_name} onChange={(e) => update("vessel_name", e.target.value)} />
+        </label>
+        <label className="grid gap-1">
+          <span className="text-sm text-white/70">MGO tons</span>
+          <input className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm outline-none focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-400/20 transition" value={form.mgo_tons} onChange={(e) => update("mgo_tons", e.target.value)} placeholder="e.g. 120" />
+        </label>
+        <label className="grid gap-1">
+          <span className="text-sm text-white/70">IFO tons</span>
+          <input className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm outline-none focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-400/20 transition" value={form.ifo_tons} onChange={(e) => update("ifo_tons", e.target.value)} placeholder="e.g. 180" />
+        </label>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        <label className="grid gap-1">
+          <span className="text-sm text-white/70">Bunker date (start)</span>
+          <input type="date" className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm outline-none focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-400/20 transition" value={form.bunker_date_start} onChange={(e) => update("bunker_date_start", e.target.value)} />
+        </label>
+        <label className="grid gap-1">
+          <span className="text-sm text-white/70">Bunker date (end)</span>
+          <input type="date" className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm outline-none focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-400/20 transition" value={form.bunker_date_end} onChange={(e) => update("bunker_date_end", e.target.value)} />
+        </label>
+        <label className="grid gap-1">
+          <span className="text-sm text-white/70">Port</span>
+          <PortDropdown value={form.port} onChange={(val) => update("port", val)} />
+        </label>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        <label className="grid gap-1">
+          <span className="text-sm text-white/70">Agent name</span>
+          <input className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm outline-none focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-400/20 transition" value={form.agent_name} onChange={(e) => update("agent_name", e.target.value)} />
+        </label>
+      </div>
+
+      <label className="grid gap-1">
+        <span className="text-sm text-white/70">Full order text</span>
+        <textarea className="bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-400/20 transition min-h-[100px] resize-none" value={form.full_order_text} onChange={(e) => update("full_order_text", e.target.value)} placeholder="e.g. 75 mt MGO&#10;Supply 17-19.08.&#10;&#10;Mv Kaari&#10;St.Petersburg&#10;&#10;Rusnautic&#10;Agency dept." />
+      </label>
+
+      <div className="flex items-center gap-3 justify-end">
+        <button disabled={submitting} className="px-5 py-2 text-sm rounded-lg bg-gradient-to-r from-emerald-500 to-teal-500 disabled:opacity-50 transition font-medium">
+          {submitting ? "Submitting…" : "Submit request"}
+        </button>
+        {message && <span className="text-sm text-white/70">{message}</span>}
+      </div>
+    </form>
+  );
+}
+
+// First Nomination Form
+function FirstNominationForm({ onClose }: { onClose: () => void }) {
+  const [submitting, setSubmitting] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const [form, setForm] = useState<FirstNominationData>({
+    vessel_name: "",
+    vessel_imo: "",
+    vessel_flag: "",
+  });
+
+  const update = (k: keyof FirstNominationData, v: string) => setForm((f) => ({ ...f, [k]: v }));
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+    setMessage(null);
+    try {
+      // Implement API call for first nomination
+      setMessage("First nomination submitted successfully");
+    } catch (err: any) {
+      setMessage(`Error: ${err?.message || "failed"}`);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <form onSubmit={submit} className="rounded-2xl border border-white/10 bg-gradient-to-b from-[#11171c] to-[#0c1115] p-5 grid gap-3 max-w-4xl">
+      <div className="flex items-center justify-between">
+        <h3 className="text-xl font-semibold tracking-wide">Generate first nomination</h3>
+        <button type="button" className="text-white/60" onClick={onClose}>Close</button>
+      </div>
+      
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        <label className="grid gap-1">
+          <span className="text-sm text-white/70">Vessel name</span>
+          <input className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm outline-none focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-400/20 transition" value={form.vessel_name} onChange={(e) => update("vessel_name", e.target.value)} />
+        </label>
+        <label className="grid gap-1">
+          <span className="text-sm text-white/70">Vessel IMO</span>
+          <input className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm outline-none focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-400/20 transition" value={form.vessel_imo} onChange={(e) => update("vessel_imo", e.target.value)} placeholder="e.g. 9876543" inputMode="numeric" />
+        </label>
+        <label className="grid gap-1">
+          <span className="text-sm text-white/70">Vessel flag</span>
+          <input className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm outline-none focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-400/20 transition" value={form.vessel_flag} onChange={(e) => update("vessel_flag", e.target.value)} placeholder="e.g. Panama" />
+        </label>
+      </div>
+
+      <div className="flex items-center gap-3 justify-end">
+        <button disabled={submitting} className="px-5 py-2 text-sm rounded-lg bg-gradient-to-r from-emerald-500 to-teal-500 disabled:opacity-50 transition font-medium">
+          {submitting ? "Generating…" : "Generate & email"}
+        </button>
+        {message && <span className="text-sm text-white/70">{message}</span>}
+      </div>
+    </form>
+  );
+}
+
+// Final Nomination Form
+function FinalNominationForm({ onClose }: { onClose: () => void }) {
+  const [submitting, setSubmitting] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const [form, setForm] = useState<FinalNominationData>({
+    vessel_name: "",
+    actual_mgo_tons: "",
+    mgo_price: "",
+    actual_ifo_tons: "",
+    ifo_price: "",
+    bunker_date: "",
+  });
+
+  const update = (k: keyof FinalNominationData, v: string) => setForm((f) => ({ ...f, [k]: v }));
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+    setMessage(null);
+    try {
+      // Implement API call for final nomination
+      setMessage("Final nomination submitted successfully");
+    } catch (err: any) {
+      setMessage(`Error: ${err?.message || "failed"}`);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <form onSubmit={submit} className="rounded-2xl border border-white/10 bg-gradient-to-b from-[#11171c] to-[#0c1115] p-5 grid gap-3 max-w-4xl">
+      <div className="flex items-center justify-between">
+        <h3 className="text-xl font-semibold tracking-wide">Generate final nomination</h3>
+        <button type="button" className="text-white/60" onClick={onClose}>Close</button>
+      </div>
+      
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <label className="grid gap-1">
+          <span className="text-sm text-white/70">Vessel name</span>
+          <input className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm outline-none focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-400/20 transition" value={form.vessel_name} onChange={(e) => update("vessel_name", e.target.value)} />
+        </label>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <label className="grid gap-1">
+          <span className="text-sm text-white/70">Actual MGO tons</span>
+          <input className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm outline-none focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-400/20 transition" value={form.actual_mgo_tons} onChange={(e) => update("actual_mgo_tons", e.target.value)} placeholder="e.g. 120" />
+        </label>
+        <label className="grid gap-1">
+          <span className="text-sm text-white/70">MGO price</span>
+          <input className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm outline-none focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-400/20 transition" value={form.mgo_price} onChange={(e) => update("mgo_price", e.target.value)} placeholder="e.g. 535.00" inputMode="decimal" />
+        </label>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <label className="grid gap-1">
+          <span className="text-sm text-white/70">Actual IFO tons</span>
+          <input className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm outline-none focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-400/20 transition" value={form.actual_ifo_tons} onChange={(e) => update("actual_ifo_tons", e.target.value)} placeholder="e.g. 180" />
+        </label>
+        <label className="grid gap-1">
+          <span className="text-sm text-white/70">IFO price</span>
+          <input className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm outline-none focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-400/20 transition" value={form.ifo_price} onChange={(e) => update("ifo_price", e.target.value)} placeholder="e.g. 505.00" inputMode="decimal" />
+        </label>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <label className="grid gap-1">
+          <span className="text-sm text-white/70">Bunker date (single date)</span>
+          <input type="date" className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm outline-none focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-400/20 transition" value={form.bunker_date} onChange={(e) => update("bunker_date", e.target.value)} />
+        </label>
+      </div>
+
+      <div className="flex items-center gap-3 justify-end">
+        <button disabled={submitting} className="px-5 py-2 text-sm rounded-lg bg-gradient-to-r from-emerald-500 to-teal-500 disabled:opacity-50 transition font-medium">
+          {submitting ? "Generating…" : "Generate & email"}
+        </button>
+        {message && <span className="text-sm text-white/70">{message}</span>}
+      </div>
+    </form>
   );
 }
 
@@ -327,7 +584,7 @@ export default function DashboardPage() {
   const router = useRouter();
   const [now, setNow] = useState<Date>(new Date());
   const [sidebarExpanded, setSidebarExpanded] = useState(false);
-  const [showForm, setShowForm] = useState<boolean>(false);
+  const [activeForm, setActiveForm] = useState<string | null>(null);
 
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 60_000);
@@ -427,7 +684,13 @@ export default function DashboardPage() {
               (label) => (
                 <button
                   key={label}
-                  onClick={() => setShowForm(label !== "Generate invoice" && label !== "Record trade")}
+                  onClick={() => {
+                    if (label === "Generate invoice" || label === "Record trade") {
+                      setActiveForm(null);
+                    } else {
+                      setActiveForm(label);
+                    }
+                  }}
                   className="text-left px-4 py-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 transition"
                 >
                   {label}
@@ -441,8 +704,14 @@ export default function DashboardPage() {
           
           {/* Form section */}
           <div className="flex-1 mt-4 lg:mt-0">
-            {showForm ? (
-              <NominationForm onClose={() => setShowForm(false)} />
+            {activeForm === "Initiate new request" ? (
+              <InitialRequestForm onClose={() => setActiveForm(null)} />
+            ) : activeForm === "Generate first nomination" ? (
+              <FirstNominationForm onClose={() => setActiveForm(null)} />
+            ) : activeForm === "Generate final nomination" ? (
+              <FinalNominationForm onClose={() => setActiveForm(null)} />
+            ) : activeForm ? (
+              <NominationForm onClose={() => setActiveForm(null)} />
             ) : (
               <div className="rounded-xl border border-white/10 bg-white/[0.02] min-h-[320px] grid place-items-center text-white/50">
                 Select an action to open the form
