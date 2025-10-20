@@ -449,121 +449,132 @@ class InvoiceData(BaseModel):
     company_address: str = ""
 
 
-def determine_bank(currency):
-    """Determine bank details based on currency"""
-    bank_details = {
-        'AED': {
-            'name': 'Bank of Dubai',
-            'account': '10000000000001',
-            'iban': 'AE10000000000001',
-            'swift': 'AEDABUXXX'
-        },
-        'USD': {
-            'name': 'Bank of Dubai',
-            'account': '10000000000002',
-            'iban': 'AE10000000000002',
-            'swift': 'AEDABUXXX'
-        },
-        'EUR': {
-            'name': 'Bank of Dubai',
-            'account': '10000000000003',
-            'iban': 'AE10000000000003',
-            'swift': 'AEDABUXXX'
-        },
-        'BHD': {
-            'name': 'Bank of Dubai',
-            'account': '10000000000004',
-            'iban': 'AE10000000000004',
-            'swift': 'AEDABUXXX'
-        }
-    }
-    return bank_details.get(currency, bank_details['USD'])
+def determine_bank(dict_):
+    """Determine bank details based on currency - matches original script"""
+    if dict_.get('X1_UC') == 'AED':
+        bank_name = 'ITHMAAR BANK B.S.C.'
+        bank_account_number = 1000000000001
+        bank_account_iban = 'DH00000000000000001'
+        bank_swift_code = 'DXBAAAXXX'
+    elif dict_.get('X1_UC') == 'USD':
+        bank_name = 'Bank of Dubai'
+        bank_account_number = 1000000000002
+        bank_account_iban = 'DH00000000000000002'
+        bank_swift_code = 'DXBAAAXXY'
+    elif dict_.get('X1_UC') == 'EUR':
+        bank_name = 'Bank of Dubai'
+        bank_account_number = 1000000000003
+        bank_account_iban = 'DH00000000000000003'
+        bank_swift_code = 'DXBAAAXXZ'
+    elif dict_.get('X1_UC') == 'BHD':
+        bank_name = 'Bank of Dubai'
+        bank_account_number = 1000000000004
+        bank_account_iban = 'DH00000000000000004'
+        bank_swift_code = 'DXBAAAXYY'
+    else:
+        # Default to USD
+        bank_name = 'Bank of Dubai'
+        bank_account_number = 1000000000002
+        bank_account_iban = 'DH00000000000000002'
+        bank_swift_code = 'DXBAAAXXY'
+    
+    return [bank_name, bank_account_number, bank_account_iban, bank_swift_code]
 
 
 @app.post('/generate-invoice')
 async def generate_invoice(invoice_data: InvoiceData):
-    """Generate invoice PDF and return file path or S3 URL"""
+    """Generate invoice PDF - matches temp_file2.ipynb exactly"""
     global queued_up_files
     queued_up_files = []
     
     try:
-        # Determine which template to use based on product types
-        has_mgo = invoice_data.mgo_tons and invoice_data.mgo_tons != "0"
-        has_ifo = invoice_data.ifo_tons and invoice_data.ifo_tons != "0"
+        # Determine template - matches notebook logic
+        has_mgo = invoice_data.mgo_tons and invoice_data.mgo_tons != "0" and float(invoice_data.mgo_tons) > 0
+        has_ifo = invoice_data.ifo_tons and invoice_data.ifo_tons != "0" and float(invoice_data.ifo_tons) > 0
         
-        # Use invoice templates if they exist, otherwise fallback to nomination templates
         if has_mgo and has_ifo:
-            template_path = BOTH_INVOICE_TEMPLATE if os.path.exists(BOTH_INVOICE_TEMPLATE) else BOTH_TEMPLATE
+            # Both MGO and IFO
+            in_path = BOTH_INVOICE_TEMPLATE if os.path.exists(BOTH_INVOICE_TEMPLATE) else BOTH_TEMPLATE
         elif has_mgo:
-            template_path = MGO_INVOICE_TEMPLATE if os.path.exists(MGO_INVOICE_TEMPLATE) else MGO_TEMPLATE 
+            # MGO only
+            in_path = MGO_INVOICE_TEMPLATE if os.path.exists(MGO_INVOICE_TEMPLATE) else MGO_TEMPLATE
         elif has_ifo:
-            template_path = IFO_INVOICE_TEMPLATE if os.path.exists(IFO_INVOICE_TEMPLATE) else IFO_TEMPLATE
+            # IFO only
+            in_path = IFO_INVOICE_TEMPLATE if os.path.exists(IFO_INVOICE_TEMPLATE) else IFO_TEMPLATE
         else:
-            return {'ok': False, 'error': 'No products selected'}
+            return {'ok': False, 'error': 'No products selected', 'message': 'Please enter MGO or IFO quantities'}
         
-        # Calculate totals
-        mgo_total = float(invoice_data.mgo_tons or 0) * invoice_data.mgo_price * invoice_data.exchange_rate if has_mgo else 0
-        ifo_total = float(invoice_data.ifo_tons or 0) * invoice_data.ifo_price * invoice_data.exchange_rate if has_ifo else 0
-        subtotal = mgo_total + ifo_total
-        
-        # Get bank details
-        bank = determine_bank(invoice_data.currency)
-        
-        # Prepare replacements
+        # First replacements - basic data (matches notebook exactly)
         replacements = {
-            'X1_CN': invoice_data.company_name.upper(),
-            'X1_COADR': invoice_data.company_address.upper(),
+            'X1_CN': str(invoice_data.company_name).upper(),
+            'X1_COADR': str(invoice_data.company_address).upper() if invoice_data.company_address else '',
             'X1_UC': invoice_data.currency,
             'X1_UXER': invoice_data.exchange_rate,
-            'X1_VSLN': invoice_data.vessel_name.upper(),
+            'X1_VSLN': str(invoice_data.vessel_name).upper(),
             'X1_IMO': invoice_data.vessel_imo,
-            'X1_VSLF': invoice_data.vessel_flag.upper(),
-            'X1_VSLP': invoice_data.vessel_port.upper(),
+            'X1_VSLP': str(invoice_data.vessel_port).upper(),
             'X1_VSLSD': invoice_data.supply_date,
             'X1_BDN': invoice_data.bdn_numbers,
         }
         
+        # Add MGO fields if present
         if has_mgo:
-            replacements['X1_MQ'] = invoice_data.mgo_tons
+            replacements['X1_MQ'] = float(invoice_data.mgo_tons)
             replacements['X1_MP'] = invoice_data.mgo_price
-            replacements['X1_MGOT'] = f"{mgo_total:,.2f}"
             
+        # Add IFO fields if present  
         if has_ifo:
-            replacements['X1_IQ'] = invoice_data.ifo_tons
+            replacements['X1_IQ'] = float(invoice_data.ifo_tons)
             replacements['X1_IP'] = invoice_data.ifo_price
-            replacements['X1_IFOT'] = f"{ifo_total:,.2f}"
         
-        # Additional replacements
+        # Calculate totals (matches notebook logic)
+        mgo_total = float(invoice_data.mgo_tons or 0) * invoice_data.mgo_price * invoice_data.exchange_rate if has_mgo else 0
+        ifo_total = float(invoice_data.ifo_tons or 0) * invoice_data.ifo_price * invoice_data.exchange_rate if has_ifo else 0
+        total = mgo_total + ifo_total
+        
+        # Second replacements - calculated values (matches notebook)
         supply_date_obj = get_bunker_date(invoice_data.supply_date)
         payment_deadline = supply_date_obj + timedelta(days=10)
         
         replacements2 = {
-            'X1_TOTAL': f"{subtotal:,.2f}",
-            'X1_SBTTL': f"{subtotal:,.2f}",
+            'X1_VSLF': str(invoice_data.vessel_flag).upper(),
+            'X1_TOTAL': f"{total:,.2f}",
             'X1_PYMTD': payment_deadline,
             'X1_DATE': supply_date_obj,
-            'X1_RN': supply_date_obj.strftime("%Y%m%d") + '-INV-' + invoice_data.vessel_name.replace(' ', '_'),
-            'X2_BANK': bank['name'].upper(),
-            'X2_SWIFT': bank['swift'],
-            'X2_ULIBAN': bank['iban'],
-            'X2_ULAN': bank['account']
+            'X1_RN': supply_date_obj.strftime("%Y%m%d") + '-B-' + str(invoice_data.vessel_name).replace(' ', '_'),
+            'X1_SBTTL': f"{total:,.2f}",
         }
         
-        # Generate files
-        if not os.path.exists(template_path):
-            return {'ok': False, 'error': f'Template not found: {template_path}'}
+        if has_mgo:
+            replacements2['X1_MGOT'] = f"{mgo_total:,.2f}"
+        if has_ifo:
+            replacements2['X1_IFOT'] = f"{ifo_total:,.2f}"
             
+        # Bank details
+        bank = determine_bank(replacements)
+        replacements2['X2_BANK'] = str(bank[0]).upper()
+        replacements2['X2_SWIFT'] = str(bank[3]).upper()
+        replacements2['X2_ULIBAN'] = bank[2]
+        replacements2['X2_ULAN'] = bank[1]
+        
+        # Check template exists
+        if not os.path.exists(in_path):
+            return {'ok': False, 'error': f'Template not found: {in_path}'}
+        
+        # Generate file
         output_filename = replacements2['X1_RN']
         out_path = os.path.join(FINISHED_DIR, f"{output_filename}.docx")
         
-        replace_strings_in_docx(template_path, out_path, replacements, 1)
+        # Apply replacements in two passes (matches notebook)
+        replace_strings_in_docx(in_path, out_path, replacements, 1)
         replace_strings_in_docx(out_path, out_path, replacements2, 1)
         
         # Convert to PDF
+        input_docx = out_path
         output_pdf = os.path.join(FINISHED_DIR, f"{output_filename}.pdf")
-        final_path = convert_docx_to_pdf(out_path, output_pdf, LIBREOFFICE_PATH)
+        final_path = convert_docx_to_pdf(input_docx, output_pdf, LIBREOFFICE_PATH)
         
-        # Delete intermediate DOCX if PDF was created
+        # Delete DOCX if PDF created successfully
         if final_path.endswith('.pdf'):
             delete_file(out_path)
             
@@ -580,6 +591,8 @@ async def generate_invoice(invoice_data: InvoiceData):
             'filename': os.path.basename(final_path)
         }
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return {'ok': False, 'error': str(e), 'message': f'Failed to generate invoice: {str(e)}'}
 
 
