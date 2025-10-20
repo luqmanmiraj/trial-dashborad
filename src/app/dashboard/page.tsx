@@ -77,6 +77,74 @@ type NominationFormData = {
   vessel_agent: string;
 };
 
+const PORTS = [
+  "Singapore", "Rotterdam", "Fujairah", "Gibraltar", "Houston", "Antwerp",
+  "Panama", "Las Palmas", "Piraeus", "Algeciras", "Zhoushan", "Busan",
+  "Istanbul", "Port Said", "Colombo", "Hong Kong", "Dubai", "Jebel Ali"
+];
+
+function PortDropdown({ value, onChange }: { value: string; onChange: (val: string) => void }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  return (
+    <div ref={dropdownRef} className="relative">
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 outline-none focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-400/20 transition text-white text-left hover:bg-white/10 flex items-center justify-between"
+      >
+        <span className={value ? "text-white" : "text-white/50"}>{value || "Select port"}</span>
+        <svg
+          width="12"
+          height="8"
+          viewBox="0 0 12 8"
+          fill="none"
+          className={`transition-transform ${isOpen ? "rotate-180" : ""}`}
+        >
+          <path
+            d="M1 1.5L6 6.5L11 1.5"
+            stroke="currentColor"
+            strokeOpacity="0.6"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      </button>
+      {isOpen && (
+        <div className="absolute z-50 w-full mt-1 bg-[#1a1f24] border border-white/10 rounded-lg shadow-lg max-h-[240px] overflow-y-auto">
+          {PORTS.map((port) => (
+            <button
+              key={port}
+              type="button"
+              onClick={() => {
+                onChange(port);
+                setIsOpen(false);
+              }}
+              className={`w-full px-3 py-2 text-left hover:bg-white/10 transition ${
+                value === port ? "bg-emerald-500/20 text-emerald-300" : "text-white"
+              }`}
+            >
+              {port}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function NominationForm({ onClose }: { onClose: () => void }) {
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -160,7 +228,7 @@ function NominationForm({ onClose }: { onClose: () => void }) {
   );
 
   return (
-    <form onSubmit={submit} className="rounded-2xl border border-white/10 bg-gradient-to-b from-[#11171c] to-[#0c1115] p-5 grid gap-4 shadow-[0_10px_40px_rgba(0,0,0,0.35)] max-w-5xl mx-auto">
+    <form onSubmit={submit} className="rounded-2xl border border-white/10 bg-gradient-to-b from-[#11171c] to-[#0c1115] p-5 grid gap-4 w-full">
       <div className="flex items-center justify-between">
         <h3 className="text-xl font-semibold tracking-wide">Generate nomination</h3>
         <button type="button" className="text-white/60 hover:text-white" onClick={onClose}>Close</button>
@@ -169,7 +237,11 @@ function NominationForm({ onClose }: { onClose: () => void }) {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
         {input("vessel_name", "Vessel name")}
         {input("vessel_imo", "Vessel IMO", { inputMode: "numeric", placeholder: "e.g. 9876543" })}
-        {input("vessel_port", "Port")}
+        {/* Port dropdown */}
+        <label className="grid gap-1">
+          <span className="text-sm text-white/70">Port</span>
+          <PortDropdown value={form.vessel_port} onChange={(val) => update("vessel_port", val)} />
+        </label>
         {/* Date */}
         <label className="grid gap-1">
           <span className="text-sm text-white/70">Supply date</span>
@@ -231,7 +303,7 @@ function NominationForm({ onClose }: { onClose: () => void }) {
       </div>
 
       <div className="flex items-center gap-3 justify-end">
-        <button disabled={submitting} className="px-6 py-2.5 rounded-lg bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 disabled:opacity-50 shadow-[0_8px_30px_rgba(16,185,129,0.25)] transition font-medium">
+        <button disabled={submitting} className="px-6 py-2.5 rounded-lg bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 disabled:opacity-50 transition font-medium">
           {submitting ? "Generating…" : "Generate & email"}
         </button>
         {message && (
@@ -348,8 +420,9 @@ export default function DashboardPage() {
 
         <div className="h-px bg-white/10 my-6" />
 
-        <div className="grid grid-cols-1 lg:grid-cols-[320px_minmax(0,1fr)] gap-6 items-start">
-          <div className="grid gap-3">
+        <div className="flex flex-col lg:flex-row items-stretch">
+          {/* Buttons section */}
+          <div className="grid gap-3 w-full lg:w-[280px] flex-shrink-0">
             {["Initiate new request", "Generate first nomination", "Generate final nomination", "Generate invoice", "Record trade"].map(
               (label) => (
                 <button
@@ -362,11 +435,16 @@ export default function DashboardPage() {
               )
             )}
           </div>
-          <div className="min-h-[320px]">
+          
+          {/* Vertical divider */}
+          <div className="hidden lg:block w-px bg-white/10 mx-5 self-stretch" />
+          
+          {/* Form section */}
+          <div className="flex-1 mt-4 lg:mt-0">
             {showForm ? (
               <NominationForm onClose={() => setShowForm(false)} />
             ) : (
-              <div className="rounded-xl border border-white/10 bg-white/[0.02] h-full grid place-items-center text-white/50">
+              <div className="rounded-xl border border-white/10 bg-white/[0.02] min-h-[320px] grid place-items-center text-white/50">
                 Select an action to open the form
               </div>
             )}
