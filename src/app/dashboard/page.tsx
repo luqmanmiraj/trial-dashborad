@@ -24,8 +24,20 @@ function MiniChart({ title, series, up }: { title: string; series: SeriesPoint[]
   const pad = Number.isFinite(min) && Number.isFinite(max) ? Math.max((max - min) * 0.1, (max || 1) * 0.001) : 1;
 
   return (
-    <div className="relative overflow-hidden rounded-xl border border-white/10 bg-[#0f1418] flex-1 h-[280px]">
-      <div className="absolute inset-0 w-full h-full">
+    <div className="relative overflow-hidden rounded-xl border border-white/10 bg-[#0f1418] flex-1 h-[280px] select-none outline-none focus:outline-none" tabIndex={-1}>
+      {/* Text header - reserved space */}
+      <div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between px-4 py-2 text-sm text-white/80 bg-gradient-to-b from-[#0f1418] to-transparent pointer-events-none">
+        <span className="font-medium">{title}</span>
+        {last !== null && (
+          <span className={`tabular-nums ${change !== null && change >= 0 ? "text-emerald-300" : "text-red-300"}`}>
+            {last.toFixed(3)}{change !== null && (
+              <span className="ml-2 text-white/60">{change >= 0 ? "+" : ""}{change.toFixed(2)}%</span>
+            )}
+          </span>
+        )}
+      </div>
+      {/* Chart area - starts below header */}
+      <div className="absolute top-10 left-0 right-0 bottom-0 w-full pointer-events-none">
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={data} margin={{ left: 0, right: 0, top: 0, bottom: 0 }}>
             <defs>
@@ -49,16 +61,6 @@ function MiniChart({ title, series, up }: { title: string; series: SeriesPoint[]
             <Area type="monotone" dataKey="y" stroke={color} fill={`url(#${safeId})`} strokeWidth={2} />
           </AreaChart>
         </ResponsiveContainer>
-      </div>
-      <div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between px-4 py-2 text-sm text-white/80 backdrop-blur-[1px]">
-        <span className="font-medium">{title}</span>
-        {last !== null && (
-          <span className={`tabular-nums ${change !== null && change >= 0 ? "text-emerald-300" : "text-red-300"}`}>
-            {last.toFixed(3)}{change !== null && (
-              <span className="ml-2 text-white/60">{change >= 0 ? "+" : ""}{change.toFixed(2)}%</span>
-            )}
-          </span>
-        )}
       </div>
     </div>
   );
@@ -93,7 +95,9 @@ type FinalNominationData = {
 type NominationFormData = {
   vessel_name: string;
   vessel_imo: string;
+  vessel_flag: string;
   vessel_port: string;
+  bdn_numbers: string;
   mgo_tons: string;
   mgo_price: string;
   ifo_tons: string;
@@ -101,6 +105,8 @@ type NominationFormData = {
   vessel_supply_date: string; // DD.MM.YYYY
   vessel_trader: string;
   vessel_agent: string;
+  currency: string;
+  exchange_rate: string;
 };
 
 const PORTS = [
@@ -411,7 +417,9 @@ function NominationForm({ onClose }: { onClose: () => void }) {
   const [form, setForm] = useState<NominationFormData>({
     vessel_name: "",
     vessel_imo: "",
+    vessel_flag: "",
     vessel_port: "",
+    bdn_numbers: "",
     mgo_tons: "0",
     mgo_price: "0",
     ifo_tons: "0",
@@ -419,6 +427,8 @@ function NominationForm({ onClose }: { onClose: () => void }) {
     vessel_supply_date: "",
     vessel_trader: "",
     vessel_agent: "",
+    currency: "USD",
+    exchange_rate: "1",
   });
 
   const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -490,42 +500,30 @@ function NominationForm({ onClose }: { onClose: () => void }) {
         <h3 className="text-xl font-semibold tracking-wide">Generate nomination</h3>
         <button type="button" className="text-white/60" onClick={onClose}>Close</button>
       </div>
-      {/* Essentials */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+      {/* Vessel Details */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         {input("vessel_name", "Vessel name")}
         {input("vessel_imo", "Vessel IMO", { inputMode: "numeric", placeholder: "e.g. 9876543" })}
-        {/* Port dropdown */}
+        {input("vessel_flag", "Vessel flag", { placeholder: "e.g. Panama" })}
+      </div>
+
+      {/* Port, Date, BDN */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         <label className="grid gap-1">
           <span className="text-sm text-white/70">Port</span>
           <PortDropdown value={form.vessel_port} onChange={(val) => update("vessel_port", val)} />
         </label>
-        {/* Date */}
         <label className="grid gap-1">
-          <span className="text-sm text-white/70">Supply date</span>
-          <div className="relative">
-            <input
-              ref={dateRef}
-              type="date"
-              className="bg-white/5 border border-white/10 rounded-lg pl-3 pr-10 py-2 w-full outline-none focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-400/20 transition"
-              value={form.vessel_supply_date}
-              onChange={(e) => update("vessel_supply_date", e.target.value)}
-              style={{ backgroundImage: "none" }}
-            />
-            <button
-              type="button"
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-white/80"
-              onMouseDown={(e) => { e.preventDefault(); try { (dateRef.current as any)?.showPicker?.(); } catch {} }}
-              aria-label="Open calendar"
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-                <line x1="16" y1="2" x2="16" y2="6" />
-                <line x1="8" y1="2" x2="8" y2="6" />
-                <line x1="3" y1="10" x2="21" y2="10" />
-              </svg>
-            </button>
-          </div>
+          <span className="text-sm text-white/70">Supply date (DD.MM.YYYY)</span>
+          <input
+            type="text"
+            className="bg-white/5 border border-white/10 rounded-lg px-3 py-2 outline-none focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-400/20 transition"
+            value={form.vessel_supply_date}
+            onChange={(e) => update("vessel_supply_date", e.target.value)}
+            placeholder="DD.MM.YYYY"
+          />
         </label>
+        {input("bdn_numbers", "BDN numbers", { placeholder: "e.g. 2807/01,2807/02" })}
       </div>
 
       {/* Product toggles */}
@@ -551,12 +549,10 @@ function NominationForm({ onClose }: { onClose: () => void }) {
         )}
       </div>
 
-      {/* Optional */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-        {input("vessel_trader", "Trader (optional)")}
-        {input("vessel_agent", "Agent (optional)")}
-        <div className="hidden md:block" />
-        <div className="hidden md:block" />
+      {/* Trader and Agent */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        {input("vessel_trader", "Trader")}
+        {input("vessel_agent", "Agent")}
       </div>
 
       <div className="flex items-center gap-3 justify-end">
@@ -596,50 +592,62 @@ export default function DashboardPage() {
     router.replace("/login");
   };
 
-  const charts = ["BRNT", "WTI", "NG", "USD/EUR"] as const;
+  const charts = ["BRNT", "WTI", "NG", "USD/RUB"] as const;
 
   return (
     <div className="min-h-screen bg-[#0b0f12] text-white flex">
       {/* Left navigation */}
       <aside 
-        className={`${sidebarExpanded ? 'w-48' : 'w-16 sm:w-20'} bg-[#0a0e11] border-r border-white/10 flex flex-col items-center py-4 gap-3 transition-all duration-300 ease-in-out relative group`}
+        className={`${sidebarExpanded ? 'w-48' : 'w-16 sm:w-20'} bg-[#0a0e11] border-r border-white/10 flex flex-col py-4 gap-3 transition-all duration-300 ease-in-out relative overflow-hidden`}
         onMouseEnter={() => setSidebarExpanded(true)}
         onMouseLeave={() => setSidebarExpanded(false)}
       >
-        <div className="w-8 h-8 rounded-lg bg-emerald-400/20 border border-emerald-400/40" />
+        <div className="flex items-center px-4 gap-3">
+          <div className="w-8 h-8 rounded-lg bg-emerald-400/20 border border-emerald-400/40 flex-shrink-0" />
+          <span className={`text-sm font-medium text-white whitespace-nowrap transition-opacity duration-300 ${sidebarExpanded ? 'opacity-100' : 'opacity-0'}`}>
+            Dashboard
+          </span>
+        </div>
         {Array.from({ length: 10 }).map((_, i) => (
-          <div 
-            key={i} 
-            className={`w-8 h-8 rounded-md bg-white/5 border border-white/10 transition-all duration-200 ${sidebarExpanded ? 'hover:bg-white/10 hover:scale-105' : ''}`}
-          />
+          <div key={i} className="flex items-center px-4 gap-3 hover:bg-white/5 transition-colors cursor-pointer">
+            <div className="w-8 h-8 rounded-md bg-white/5 border border-white/10 flex-shrink-0" />
+            <span className={`text-sm text-white/70 whitespace-nowrap transition-opacity duration-300 ${sidebarExpanded ? 'opacity-100' : 'opacity-0'}`}>
+              Item {i + 1}
+            </span>
+          </div>
         ))}
         {/* Bottom icons: user and settings */}
-        <div className="mt-auto flex flex-col items-center gap-3 pb-1">
+        <div className="mt-auto flex flex-col gap-3">
           <button
             aria-label="Account"
-            className="w-9 h-9 rounded-md bg-white/5 border border-white/10 hover:bg-white/10 grid place-items-center transition-all duration-200 hover:scale-105"
+            className="flex items-center px-4 gap-3 hover:bg-white/5 transition-colors w-full text-left"
           >
+            <div className="w-9 h-9 rounded-md bg-white/5 border border-white/10 grid place-items-center flex-shrink-0">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" strokeWidth="1.5">
               <circle cx="12" cy="8" r="3" />
               <path d="M4 20c0-3.314 3.134-6 8-6s8 2.686 8 6" />
             </svg>
+            </div>
+            <span className={`text-sm text-white/70 whitespace-nowrap transition-opacity duration-300 ${sidebarExpanded ? 'opacity-100' : 'opacity-0'}`}>
+              Account
+            </span>
           </button>
           <button
             aria-label="Settings"
-            className="w-9 h-9 rounded-md bg-white/5 border border-white/10 hover:bg-white/10 grid place-items-center transition-all duration-200 hover:scale-105"
+            className="flex items-center px-4 gap-3 hover:bg-white/5 transition-colors w-full text-left"
             onClick={logout}
           >
+            <div className="w-9 h-9 rounded-md bg-white/5 border border-white/10 grid place-items-center flex-shrink-0">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" strokeWidth="1.5">
               <path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z" />
               <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9c0 .68.39 1.3 1.01 1.59.31.15.66.41.66.41" />
             </svg>
+            </div>
+            <span className={`text-sm text-white/70 whitespace-nowrap transition-opacity duration-300 ${sidebarExpanded ? 'opacity-100' : 'opacity-0'}`}>
+              Logout
+            </span>
           </button>
         </div>
-        
-        {/* Interactive overlay with subtle glow effect */}
-        {sidebarExpanded && (
-          <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/5 to-blue-500/5 rounded-lg opacity-0 animate-fadeIn pointer-events-none" />
-        )}
       </aside>
 
       {/* Main content */}
@@ -669,8 +677,8 @@ export default function DashboardPage() {
             <MiniChart
               key={name}
               title={name}
-              series={data?.data?.[name === "USD/EUR" ? "EUR/USD" : (name as string)]?.series || []}
-              up={data?.data?.[name === "USD/EUR" ? "EUR/USD" : (name as string)]?.up ?? true}
+              series={data?.data?.[name as string]?.series || []}
+              up={data?.data?.[name as string]?.up ?? true}
             />
           ))}
         </div>
