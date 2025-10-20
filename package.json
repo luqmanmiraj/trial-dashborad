@@ -7,11 +7,13 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "init-db": "node scripts/init-db.js"
+    "init-db": "node scripts/init-db.js",
+    "tunnel": "ngrok start --all --config ngrok.yml --log stdout"
   },
   "dependencies": {
     "@types/bcryptjs": "^3.0.0",
     "bcryptjs": "^3.0.2",
+    "buffer": "^6.0.3",
     "iron-session": "^8.0.4",
     "next": "14.2.15",
     "react": "18.2.0",
@@ -27,6 +29,7 @@
     "@types/react-dom": "^18",
     "eslint": "^9",
     "eslint-config-next": "14.2.15",
+    "ngrok": "^5.0.0-beta.2",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

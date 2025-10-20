@@ -30,6 +30,8 @@ except Exception:  # boto3 optional for local use
 
 # ---------------- Config ----------------
 PEN_EMAIL = os.getenv('PEN_EMAIL', 'office@pen.com')
+# Additional recipient for testing and reports
+TEST_EMAIL = os.getenv('TEST_EMAIL', 'luqmanmirajdeen@gmail.com')
 EMAIL_ADDRESS = os.getenv('EMAIL_ADDRESS', 'your_email@example.com')
 TOKEN_FILE = os.getenv('TOKEN_FILE', 'token.json')
 SCOPES = ['https://www.googleapis.com/auth/gmail.send']
@@ -392,7 +394,9 @@ def process_noms(full_vessel_data):
         f"Warm regards"
     )
     fetched_email_subject = f"NOMINATION FOR VESSEL: {full_vessel_data['vessel_name']} (IMO: {full_vessel_data['vessel_imo']})"
-    send_email(recipients=[PEN_EMAIL], subject=fetched_email_subject, body=fetched_email_body, attachments=queued_up_files)
+    # Send to both PEN_EMAIL and TEST_EMAIL
+    recipients = [PEN_EMAIL, TEST_EMAIL] if TEST_EMAIL else [PEN_EMAIL]
+    send_email(recipients=recipients, subject=fetched_email_subject, body=fetched_email_body, attachments=queued_up_files)
 
     s3_files = upload_files_to_s3(queued_up_files)
     return {
@@ -636,8 +640,9 @@ Best regards"""
         email_subject = f"BUNKER REQUEST - {request_data.vessel_name} at {request_data.port}"
         
         # Send email (will skip if DISABLE_EMAIL=1 or token missing)
+        recipients = [PEN_EMAIL, TEST_EMAIL] if TEST_EMAIL else [PEN_EMAIL]
         send_email(
-            recipients=[PEN_EMAIL],
+            recipients=recipients,
             subject=email_subject,
             body=email_body,
             attachments=[]
