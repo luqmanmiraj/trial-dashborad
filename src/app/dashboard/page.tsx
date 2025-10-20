@@ -457,38 +457,52 @@ function InvoiceForm({ onClose }: { onClose: () => void }) {
     try {
       const mgoQty = productType === "MGO" || productType === "BOTH" ? form.mgo_tons : "0";
       const ifoQty = productType === "IFO" || productType === "BOTH" ? form.ifo_tons : "0";
+      
+      const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
-      const response = await fetch("/api/generate-invoice", {
+      const response = await fetch(`${apiBase}/generate-invoice`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          ...form,
-          mgo_tons: mgoQty,
-          ifo_tons: ifoQty,
+          vessel_name: form.vessel_name,
           vessel_imo: Number(form.vessel_imo || 0),
+          vessel_flag: form.vessel_flag,
+          vessel_port: form.vessel_port,
+          bdn_numbers: form.bdn_numbers,
+          mgo_tons: mgoQty,
           mgo_price: Number(form.mgo_price || 0),
+          ifo_tons: ifoQty,
           ifo_price: Number(form.ifo_price || 0),
+          supply_date: form.supply_date,
+          currency: form.currency,
           exchange_rate: Number(form.exchange_rate || 1),
+          company_name: form.company_name,
+          company_address: form.company_address,
         }),
       });
 
-      if (!response.ok) throw new Error("Failed to generate invoice");
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: `HTTP ${response.status}` }));
+        throw new Error(errorData.message || "Failed to generate invoice");
+      }
 
-      // Check if response is PDF
-      const contentType = response.headers.get("content-type");
-      if (contentType?.includes("application/pdf")) {
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `Invoice-${form.vessel_name.replace(/\s+/g, '_')}-${Date.now()}.pdf`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        window.URL.revokeObjectURL(url);
-        setMessage("✓ Invoice downloaded successfully!");
+      const data = await response.json();
+      
+      if (data.ok && data.filename) {
+        // Download the PDF
+        const downloadUrl = `${apiBase}/download/${data.filename}`;
+        const link = document.createElement("a");
+        link.href = downloadUrl;
+        link.download = data.filename;
+        link.target = "_blank";
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        setMessage(`✓ Invoice generated! Downloading ${data.filename}...`);
+      } else if (data.s3_files?.length > 0) {
+        window.open(data.s3_files[0].url, '_blank');
+        setMessage("✓ Invoice generated! Opening S3 file...");
       } else {
-        const data = await response.json();
         setMessage(data.message || "✓ Invoice generated successfully!");
       }
     } catch (err: any) {

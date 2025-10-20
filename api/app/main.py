@@ -7,6 +7,7 @@ from datetime import datetime, date, timedelta
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from email.mime.text import MIMEText
@@ -40,6 +41,12 @@ os.makedirs(FINISHED_DIR, exist_ok=True)
 MGO_TEMPLATE = os.getenv('MGO_TEMPLATE', os.path.join(BASE_DIR, 'mgo_nom_template.docx'))
 IFO_TEMPLATE = os.getenv('IFO_TEMPLATE', os.path.join(BASE_DIR, 'ifo_nom_template.docx'))
 BOTH_TEMPLATE = os.getenv('BOTH_TEMPLATE', os.path.join(BASE_DIR, 'mgo_ifo_nom_template.docx'))
+
+# Invoice templates (will use nomination templates as fallback)
+MGO_INVOICE_TEMPLATE = os.getenv('MGO_INVOICE_TEMPLATE', os.path.join(BASE_DIR, 'mgo_invoice_template.docx'))
+IFO_INVOICE_TEMPLATE = os.getenv('IFO_INVOICE_TEMPLATE', os.path.join(BASE_DIR, 'ifo_invoice_template.docx'))
+BOTH_INVOICE_TEMPLATE = os.getenv('BOTH_INVOICE_TEMPLATE', os.path.join(BASE_DIR, 'mgo_ifo_invoice_template.docx'))
+
 LIBREOFFICE_PATH = os.getenv('LIBREOFFICE_PATH', r'C:\\Program Files\\LibreOffice\\program\\soffice.exe')
 
 
@@ -332,6 +339,19 @@ def root():
     return {'msg': 'Welcome to the API'}
 
 
+@app.get('/download/{filename}')
+async def download_file(filename: str):
+    """Download a generated file"""
+    file_path = os.path.join(FINISHED_DIR, filename)
+    if not os.path.exists(file_path):
+        return {'error': 'File not found'}, 404
+    return FileResponse(
+        file_path,
+        media_type='application/pdf' if filename.endswith('.pdf') else 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        filename=filename
+    )
+
+
 def process_noms(full_vessel_data):
     global queued_up_files
     queued_up_files = []
@@ -421,20 +441,138 @@ class InvoiceData(BaseModel):
     company_address: str = ""
 
 
+def determine_bank(currency):
+    """Determine bank details based on currency"""
+    bank_details = {
+        'AED': {
+            'name': 'Bank of Dubai',
+            'account': '10000000000001',
+            'iban': 'AE10000000000001',
+            'swift': 'AEDABUXXX'
+        },
+        'USD': {
+            'name': 'Bank of Dubai',
+            'account': '10000000000002',
+            'iban': 'AE10000000000002',
+            'swift': 'AEDABUXXX'
+        },
+        'EUR': {
+            'name': 'Bank of Dubai',
+            'account': '10000000000003',
+            'iban': 'AE10000000000003',
+            'swift': 'AEDABUXXX'
+        },
+        'BHD': {
+            'name': 'Bank of Dubai',
+            'account': '10000000000004',
+            'iban': 'AE10000000000004',
+            'swift': 'AEDABUXXX'
+        }
+    }
+    return bank_details.get(currency, bank_details['USD'])
+
+
 @app.post('/generate-invoice')
 async def generate_invoice(invoice_data: InvoiceData):
     """Generate invoice PDF and return file path or S3 URL"""
+    global queued_up_files
+    queued_up_files = []
+    
     try:
-        # This would use the invoice template logic from temp_file2.ipynb
-        # For now, return a mock response indicating the file would be generated
+        # Determine which template to use based on product types
+        has_mgo = invoice_data.mgo_tons and invoice_data.mgo_tons != "0"
+        has_ifo = invoice_data.ifo_tons and invoice_data.ifo_tons != "0"
+        
+        # Use invoice templates if they exist, otherwise fallback to nomination templates
+        if has_mgo and has_ifo:
+            template_path = BOTH_INVOICE_TEMPLATE if os.path.exists(BOTH_INVOICE_TEMPLATE) else BOTH_TEMPLATE
+        elif has_mgo:
+            template_path = MGO_INVOICE_TEMPLATE if os.path.exists(MGO_INVOICE_TEMPLATE) else MGO_TEMPLATE 
+        elif has_ifo:
+            template_path = IFO_INVOICE_TEMPLATE if os.path.exists(IFO_INVOICE_TEMPLATE) else IFO_TEMPLATE
+        else:
+            return {'ok': False, 'error': 'No products selected'}
+        
+        # Calculate totals
+        mgo_total = float(invoice_data.mgo_tons or 0) * invoice_data.mgo_price * invoice_data.exchange_rate if has_mgo else 0
+        ifo_total = float(invoice_data.ifo_tons or 0) * invoice_data.ifo_price * invoice_data.exchange_rate if has_ifo else 0
+        subtotal = mgo_total + ifo_total
+        
+        # Get bank details
+        bank = determine_bank(invoice_data.currency)
+        
+        # Prepare replacements
+        replacements = {
+            'X1_CN': invoice_data.company_name.upper(),
+            'X1_COADR': invoice_data.company_address.upper(),
+            'X1_UC': invoice_data.currency,
+            'X1_UXER': invoice_data.exchange_rate,
+            'X1_VSLN': invoice_data.vessel_name.upper(),
+            'X1_IMO': invoice_data.vessel_imo,
+            'X1_VSLF': invoice_data.vessel_flag.upper(),
+            'X1_VSLP': invoice_data.vessel_port.upper(),
+            'X1_VSLSD': invoice_data.supply_date,
+            'X1_BDN': invoice_data.bdn_numbers,
+        }
+        
+        if has_mgo:
+            replacements['X1_MQ'] = invoice_data.mgo_tons
+            replacements['X1_MP'] = invoice_data.mgo_price
+            replacements['X1_MGOT'] = f"{mgo_total:,.2f}"
+            
+        if has_ifo:
+            replacements['X1_IQ'] = invoice_data.ifo_tons
+            replacements['X1_IP'] = invoice_data.ifo_price
+            replacements['X1_IFOT'] = f"{ifo_total:,.2f}"
+        
+        # Additional replacements
+        supply_date_obj = get_bunker_date(invoice_data.supply_date)
+        payment_deadline = supply_date_obj + timedelta(days=10)
+        
+        replacements2 = {
+            'X1_TOTAL': f"{subtotal:,.2f}",
+            'X1_SBTTL': f"{subtotal:,.2f}",
+            'X1_PYMTD': payment_deadline,
+            'X1_DATE': supply_date_obj,
+            'X1_RN': supply_date_obj.strftime("%Y%m%d") + '-INV-' + invoice_data.vessel_name.replace(' ', '_'),
+            'X2_BANK': bank['name'].upper(),
+            'X2_SWIFT': bank['swift'],
+            'X2_ULIBAN': bank['iban'],
+            'X2_ULAN': bank['account']
+        }
+        
+        # Generate files
+        if not os.path.exists(template_path):
+            return {'ok': False, 'error': f'Template not found: {template_path}'}
+            
+        output_filename = replacements2['X1_RN']
+        out_path = os.path.join(FINISHED_DIR, f"{output_filename}.docx")
+        
+        replace_strings_in_docx(template_path, out_path, replacements, 1)
+        replace_strings_in_docx(out_path, out_path, replacements2, 1)
+        
+        # Convert to PDF
+        output_pdf = os.path.join(FINISHED_DIR, f"{output_filename}.pdf")
+        final_path = convert_docx_to_pdf(out_path, output_pdf, LIBREOFFICE_PATH)
+        
+        # Delete intermediate DOCX if PDF was created
+        if final_path.endswith('.pdf'):
+            delete_file(out_path)
+            
+        queued_up_files.append(final_path)
+        
+        # Upload to S3 if configured
+        s3_files = upload_files_to_s3(queued_up_files)
+        
         return {
             'ok': True,
-            'message': 'Invoice generation endpoint ready',
-            'note': 'Full invoice PDF generation with templates will be implemented',
-            'data': invoice_data.dict()
+            'message': 'Invoice generated successfully',
+            'local_files': queued_up_files,
+            's3_files': s3_files,
+            'filename': os.path.basename(final_path)
         }
     except Exception as e:
-        return {'ok': False, 'error': str(e)}
+        return {'ok': False, 'error': str(e), 'message': f'Failed to generate invoice: {str(e)}'}
 
 
 class InitialRequest(BaseModel):
