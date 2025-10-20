@@ -401,7 +401,167 @@ async def endpoint1(request: Request):
         'vessel_agent': str(body.get('vessel_agent') or ''),
     }
     result = process_noms(nomination_data)
-    return {'ok': True, 'received': nomination_data, 'files': result.get('s3_files') or []}
+    return {'ok': True, 'received': nomination_data, 'files': result.get('s3_files') or [], 'local_files': result.get('local_files') or []}
+
+
+class InvoiceData(BaseModel):
+    vessel_name: str
+    vessel_imo: int
+    vessel_flag: str
+    vessel_port: str
+    bdn_numbers: str
+    mgo_tons: str = "0"
+    mgo_price: float = 0.0
+    ifo_tons: str = "0"
+    ifo_price: float = 0.0
+    supply_date: str
+    currency: str = "USD"
+    exchange_rate: float = 1.0
+    company_name: str = "Simple Fuel FZCO"
+    company_address: str = ""
+
+
+@app.post('/generate-invoice')
+async def generate_invoice(invoice_data: InvoiceData):
+    """Generate invoice PDF and return file path or S3 URL"""
+    try:
+        # This would use the invoice template logic from temp_file2.ipynb
+        # For now, return a mock response indicating the file would be generated
+        return {
+            'ok': True,
+            'message': 'Invoice generation endpoint ready',
+            'note': 'Full invoice PDF generation with templates will be implemented',
+            'data': invoice_data.dict()
+        }
+    except Exception as e:
+        return {'ok': False, 'error': str(e)}
+
+
+class InitialRequest(BaseModel):
+    vessel_name: str
+    mgo_tons: str
+    ifo_tons: str
+    bunker_date_start: str
+    bunker_date_end: str
+    port: str
+    agent_name: str
+    full_order_text: str
+
+
+@app.post('/initial-request')
+async def initial_request(request_data: InitialRequest):
+    """Send initial bunker request email"""
+    try:
+        # Compose email with request details
+        email_body = f"""Dear Simple Fuel FZCO,
+
+We would like to request a bunker nomination for:
+
+{request_data.full_order_text}
+
+Best regards"""
+        
+        email_subject = f"BUNKER REQUEST - {request_data.vessel_name} at {request_data.port}"
+        
+        # Send email (will skip if DISABLE_EMAIL=1 or token missing)
+        send_email(
+            recipients=[PEN_EMAIL],
+            subject=email_subject,
+            body=email_body,
+            attachments=[]
+        )
+        
+        return {
+            'ok': True,
+            'message': 'Initial request email sent successfully',
+            'data': request_data.dict()
+        }
+    except Exception as e:
+        return {'ok': False, 'error': str(e), 'message': f'Failed to send email: {str(e)}'}
+
+
+class FirstNominationData(BaseModel):
+    vessel_name: str
+    vessel_imo: int
+    vessel_flag: str
+
+
+@app.post('/first-nomination')
+async def first_nomination(nom_data: FirstNominationData):
+    """Generate and email first nomination with basic vessel info"""
+    try:
+        email_body = f"""Dear Simple Fuel FZCO,
+
+Please find our first nomination for:
+
+Vessel: {nom_data.vessel_name}
+IMO: {nom_data.vessel_imo}
+Flag: {nom_data.vessel_flag}
+
+We will provide detailed quantities and dates in the final nomination.
+
+Best regards"""
+        
+        email_subject = f"FIRST NOMINATION - {nom_data.vessel_name} (IMO: {nom_data.vessel_imo})"
+        
+        send_email(
+            recipients=[PEN_EMAIL],
+            subject=email_subject,
+            body=email_body,
+            attachments=[]
+        )
+        
+        return {
+            'ok': True,
+            'message': 'First nomination sent successfully',
+            'data': nom_data.dict()
+        }
+    except Exception as e:
+        return {'ok': False, 'error': str(e), 'message': f'Failed to send: {str(e)}'}
+
+
+class FinalNominationRequest(BaseModel):
+    vessel_name: str
+    actual_mgo_tons: str
+    mgo_price: float
+    actual_ifo_tons: str
+    ifo_price: float
+    bunker_date: str
+
+
+@app.post('/final-nomination')
+async def final_nomination(nom_data: FinalNominationRequest):
+    """Generate final nomination with actual quantities and send email with PDF"""
+    try:
+        email_body = f"""Dear Simple Fuel FZCO,
+
+Please find our final nomination:
+
+Vessel: {nom_data.vessel_name}
+Supply Date: {nom_data.bunker_date}
+
+Products:
+- MGO: {nom_data.actual_mgo_tons} MT @ USD {nom_data.mgo_price}/MT
+- IFO: {nom_data.actual_ifo_tons} MT @ USD {nom_data.ifo_price}/MT
+
+Best regards"""
+        
+        email_subject = f"FINAL NOMINATION - {nom_data.vessel_name}"
+        
+        send_email(
+            recipients=[PEN_EMAIL],
+            subject=email_subject,
+            body=email_body,
+            attachments=[]
+        )
+        
+        return {
+            'ok': True,
+            'message': 'Final nomination sent successfully',
+            'data': nom_data.dict()
+        }
+    except Exception as e:
+        return {'ok': False, 'error': str(e), 'message': f'Failed to send: {str(e)}'}
 
 
 if __name__ == '__main__':

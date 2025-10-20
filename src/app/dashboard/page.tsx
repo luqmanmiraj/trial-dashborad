@@ -200,10 +200,34 @@ function InitialRequestForm({ onClose }: { onClose: () => void }) {
     setSubmitting(true);
     setMessage(null);
     try {
-      // Implement API call for initial request
-      setMessage("Initial request submitted successfully");
+      const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      
+      const payload = {
+        vessel_name: form.vessel_name,
+        mgo_tons: form.mgo_tons,
+        ifo_tons: form.ifo_tons,
+        bunker_date_start: form.bunker_date_start,
+        bunker_date_end: form.bunker_date_end,
+        port: form.port,
+        agent_name: form.agent_name,
+        full_order_text: form.full_order_text,
+      };
+
+      const res = await fetch(`${apiBase}/initial-request`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({ message: `HTTP ${res.status}` }));
+        throw new Error(errorData.message || `HTTP ${res.status}`);
+      }
+
+      const data = await res.json();
+      setMessage(data.message || "✓ Initial request sent successfully!");
     } catch (err: any) {
-      setMessage(`Error: ${err?.message || "failed"}`);
+      setMessage(`✗ Error: ${err?.message || "Failed to send request"}`);
     } finally {
       setSubmitting(false);
     }
@@ -272,6 +296,7 @@ function InitialRequestForm({ onClose }: { onClose: () => void }) {
 function FirstNominationForm({ onClose }: { onClose: () => void }) {
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [lookingUp, setLookingUp] = useState(false);
   const [form, setForm] = useState<FirstNominationData>({
     vessel_name: "",
     vessel_imo: "",
@@ -280,15 +305,53 @@ function FirstNominationForm({ onClose }: { onClose: () => void }) {
 
   const update = (k: keyof FirstNominationData, v: string) => setForm((f) => ({ ...f, [k]: v }));
 
+  const lookupVessel = async () => {
+    if (!form.vessel_imo) return;
+    setLookingUp(true);
+    setMessage(null);
+    try {
+      const res = await fetch(`/api/vessel-lookup?imo=${form.vessel_imo}`);
+      if (!res.ok) throw new Error("Vessel not found");
+      const data = await res.json();
+      setForm((f) => ({
+        ...f,
+        vessel_name: data.vessel_name || f.vessel_name,
+        vessel_flag: data.vessel_flag || f.vessel_flag,
+      }));
+      setMessage(`Found: ${data.vessel_name} (${data.vessel_flag})`);
+    } catch (err: any) {
+      setMessage(`Error: ${err?.message || "lookup failed"}`);
+    } finally {
+      setLookingUp(false);
+    }
+  };
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
     setMessage(null);
     try {
-      // Implement API call for first nomination
-      setMessage("First nomination submitted successfully");
+      const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      
+      const res = await fetch(`${apiBase}/first-nomination`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          vessel_name: form.vessel_name,
+          vessel_imo: Number(form.vessel_imo || 0),
+          vessel_flag: form.vessel_flag,
+        }),
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({ message: `HTTP ${res.status}` }));
+        throw new Error(errorData.message || `HTTP ${res.status}`);
+      }
+
+      const data = await res.json();
+      setMessage(data.message || "✓ First nomination sent successfully!");
     } catch (err: any) {
-      setMessage(`Error: ${err?.message || "failed"}`);
+      setMessage(`✗ Error: ${err?.message || "Failed to send nomination"}`);
     } finally {
       setSubmitting(false);
     }
@@ -308,7 +371,23 @@ function FirstNominationForm({ onClose }: { onClose: () => void }) {
         </label>
         <label className="grid gap-1">
           <span className="text-sm text-white/70">Vessel IMO</span>
-          <input className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm outline-none focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-400/20 transition" value={form.vessel_imo} onChange={(e) => update("vessel_imo", e.target.value)} placeholder="e.g. 9876543" inputMode="numeric" />
+          <div className="flex gap-2">
+            <input
+              className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm outline-none focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-400/20 transition flex-1"
+              value={form.vessel_imo}
+              onChange={(e) => update("vessel_imo", e.target.value)}
+              placeholder="e.g. 9876543"
+              inputMode="numeric"
+            />
+            <button
+              type="button"
+              onClick={lookupVessel}
+              disabled={lookingUp || !form.vessel_imo}
+              className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-xs font-medium transition whitespace-nowrap"
+            >
+              {lookingUp ? "..." : "Lookup"}
+            </button>
+          </div>
         </label>
         <label className="grid gap-1">
           <span className="text-sm text-white/70">Vessel flag</span>
@@ -319,6 +398,231 @@ function FirstNominationForm({ onClose }: { onClose: () => void }) {
       <div className="flex items-center gap-3 justify-end">
         <button disabled={submitting} className="px-5 py-2 text-sm rounded-lg bg-gradient-to-r from-emerald-500 to-teal-500 disabled:opacity-50 transition font-medium">
           {submitting ? "Generating…" : "Generate & email"}
+        </button>
+        {message && <span className="text-sm text-white/70">{message}</span>}
+      </div>
+    </form>
+  );
+}
+
+// Invoice Form
+function InvoiceForm({ onClose }: { onClose: () => void }) {
+  const [submitting, setSubmitting] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const [lookingUp, setLookingUp] = useState(false);
+  const [productType, setProductType] = useState<"MGO" | "IFO" | "BOTH">("BOTH");
+  const [form, setForm] = useState({
+    vessel_name: "",
+    vessel_imo: "",
+    vessel_flag: "",
+    vessel_port: "",
+    bdn_numbers: "",
+    mgo_tons: "",
+    mgo_price: "",
+    ifo_tons: "",
+    ifo_price: "",
+    supply_date: "",
+    currency: "USD",
+    exchange_rate: "1",
+    company_name: "Simple Fuel FZCO",
+    company_address: "",
+  });
+
+  const update = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }));
+
+  const lookupVessel = async () => {
+    if (!form.vessel_imo) return;
+    setLookingUp(true);
+    try {
+      const res = await fetch(`/api/vessel-lookup?imo=${form.vessel_imo}`);
+      if (!res.ok) throw new Error("Vessel not found");
+      const data = await res.json();
+      setForm((f) => ({
+        ...f,
+        vessel_name: data.vessel_name || f.vessel_name,
+        vessel_flag: data.vessel_flag || f.vessel_flag,
+      }));
+      setMessage(`Found: ${data.vessel_name} (${data.vessel_flag})`);
+    } catch (err: any) {
+      setMessage(`Error: ${err?.message || "lookup failed"}`);
+    } finally {
+      setLookingUp(false);
+    }
+  };
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+    setMessage(null);
+    try {
+      const mgoQty = productType === "MGO" || productType === "BOTH" ? form.mgo_tons : "0";
+      const ifoQty = productType === "IFO" || productType === "BOTH" ? form.ifo_tons : "0";
+
+      const response = await fetch("/api/generate-invoice", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...form,
+          mgo_tons: mgoQty,
+          ifo_tons: ifoQty,
+          vessel_imo: Number(form.vessel_imo || 0),
+          mgo_price: Number(form.mgo_price || 0),
+          ifo_price: Number(form.ifo_price || 0),
+          exchange_rate: Number(form.exchange_rate || 1),
+        }),
+      });
+
+      if (!response.ok) throw new Error("Failed to generate invoice");
+
+      // Check if response is PDF
+      const contentType = response.headers.get("content-type");
+      if (contentType?.includes("application/pdf")) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `Invoice-${form.vessel_name.replace(/\s+/g, '_')}-${Date.now()}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+        setMessage("✓ Invoice downloaded successfully!");
+      } else {
+        const data = await response.json();
+        setMessage(data.message || "✓ Invoice generated successfully!");
+      }
+    } catch (err: any) {
+      setMessage(`✗ Error: ${err?.message || "Failed to generate invoice"}`);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <form onSubmit={submit} className="rounded-2xl border border-white/10 bg-gradient-to-b from-[#11171c] to-[#0c1115] p-5 grid gap-3 max-w-4xl">
+      <div className="flex items-center justify-between">
+        <h3 className="text-xl font-semibold tracking-wide">Generate Invoice</h3>
+        <button type="button" className="text-white/60" onClick={onClose}>Close</button>
+      </div>
+
+      {/* Vessel Info */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        <label className="grid gap-1">
+          <span className="text-sm text-white/70">Vessel name</span>
+          <input className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm outline-none focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-400/20 transition" value={form.vessel_name} onChange={(e) => update("vessel_name", e.target.value)} />
+        </label>
+        <label className="grid gap-1">
+          <span className="text-sm text-white/70">Vessel IMO</span>
+          <div className="flex gap-2">
+            <input
+              className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm outline-none focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-400/20 transition flex-1"
+              value={form.vessel_imo}
+              onChange={(e) => update("vessel_imo", e.target.value)}
+              inputMode="numeric"
+              placeholder="e.g. 9876543"
+            />
+            <button
+              type="button"
+              onClick={lookupVessel}
+              disabled={lookingUp || !form.vessel_imo}
+              className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-xs font-medium transition whitespace-nowrap"
+            >
+              {lookingUp ? "..." : "Lookup"}
+            </button>
+          </div>
+        </label>
+        <label className="grid gap-1">
+          <span className="text-sm text-white/70">Vessel flag</span>
+          <input className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm outline-none focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-400/20 transition" value={form.vessel_flag} onChange={(e) => update("vessel_flag", e.target.value)} placeholder="e.g. Panama" />
+        </label>
+      </div>
+
+      {/* Port, Date, BDN */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        <label className="grid gap-1">
+          <span className="text-sm text-white/70">Port</span>
+          <PortDropdown value={form.vessel_port} onChange={(val) => update("vessel_port", val)} />
+        </label>
+        <label className="grid gap-1">
+          <span className="text-sm text-white/70">Supply date (DD.MM.YYYY)</span>
+          <input
+            type="text"
+            className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm outline-none focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-400/20 transition"
+            value={form.supply_date}
+            onChange={(e) => update("supply_date", e.target.value)}
+            placeholder="DD.MM.YYYY"
+          />
+        </label>
+        <label className="grid gap-1">
+          <span className="text-sm text-white/70">BDN numbers</span>
+          <input className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm outline-none focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-400/20 transition" value={form.bdn_numbers} onChange={(e) => update("bdn_numbers", e.target.value)} placeholder="e.g. 2807/01,2807/02" />
+        </label>
+      </div>
+
+      {/* Product selector */}
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-sm text-white/60">Products:</span>
+        <button type="button" onClick={() => setProductType("MGO")} className={`px-2.5 py-1 rounded-full text-xs border transition ${productType === "MGO" ? "bg-emerald-600/20 border-emerald-500 text-emerald-300" : "bg-white/5 border-white/15 text-white/70"}`}>MGO</button>
+        <button type="button" onClick={() => setProductType("IFO")} className={`px-2.5 py-1 rounded-full text-xs border transition ${productType === "IFO" ? "bg-emerald-600/20 border-emerald-500 text-emerald-300" : "bg-white/5 border-white/15 text-white/70"}`}>IFO</button>
+        <button type="button" onClick={() => setProductType("BOTH")} className={`px-2.5 py-1 rounded-full text-xs border transition ${productType === "BOTH" ? "bg-emerald-600/20 border-emerald-500 text-emerald-300" : "bg-white/5 border-white/15 text-white/70"}`}>Both</button>
+      </div>
+
+      {/* Products */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {(productType === "MGO" || productType === "BOTH") && (
+          <>
+            <label className="grid gap-1">
+              <span className="text-sm text-white/70">MGO tons</span>
+              <input className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm outline-none focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-400/20 transition" value={form.mgo_tons} onChange={(e) => update("mgo_tons", e.target.value)} placeholder="e.g. 120" inputMode="numeric" />
+            </label>
+            <label className="grid gap-1">
+              <span className="text-sm text-white/70">MGO price (USD/mt)</span>
+              <input className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm outline-none focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-400/20 transition" value={form.mgo_price} onChange={(e) => update("mgo_price", e.target.value)} placeholder="e.g. 535.00" inputMode="decimal" />
+            </label>
+          </>
+        )}
+        {(productType === "IFO" || productType === "BOTH") && (
+          <>
+            <label className="grid gap-1">
+              <span className="text-sm text-white/70">IFO tons</span>
+              <input className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm outline-none focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-400/20 transition" value={form.ifo_tons} onChange={(e) => update("ifo_tons", e.target.value)} placeholder="e.g. 180" inputMode="numeric" />
+            </label>
+            <label className="grid gap-1">
+              <span className="text-sm text-white/70">IFO price (USD/mt)</span>
+              <input className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm outline-none focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-400/20 transition" value={form.ifo_price} onChange={(e) => update("ifo_price", e.target.value)} placeholder="e.g. 505.00" inputMode="decimal" />
+            </label>
+          </>
+        )}
+      </div>
+
+      {/* Currency */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        <label className="grid gap-1">
+          <span className="text-sm text-white/70">Currency</span>
+          <select
+            className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm outline-none focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-400/20 transition text-white"
+            value={form.currency}
+            onChange={(e) => update("currency", e.target.value)}
+          >
+            <option value="USD" className="bg-[#1a1f24] text-white">USD</option>
+            <option value="AED" className="bg-[#1a1f24] text-white">AED</option>
+            <option value="EUR" className="bg-[#1a1f24] text-white">EUR</option>
+            <option value="BHD" className="bg-[#1a1f24] text-white">BHD</option>
+          </select>
+        </label>
+        <label className="grid gap-1">
+          <span className="text-sm text-white/70">Exchange rate to USD</span>
+          <input className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm outline-none focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-400/20 transition" value={form.exchange_rate} onChange={(e) => update("exchange_rate", e.target.value)} placeholder="e.g. 3.6725" inputMode="decimal" />
+        </label>
+        <label className="grid gap-1">
+          <span className="text-sm text-white/70">Company name</span>
+          <input className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm outline-none focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-400/20 transition" value={form.company_name} onChange={(e) => update("company_name", e.target.value)} />
+        </label>
+      </div>
+
+      <div className="flex items-center gap-3 justify-end">
+        <button disabled={submitting} className="px-5 py-2 text-sm rounded-lg bg-gradient-to-r from-emerald-500 to-teal-500 disabled:opacity-50 transition font-medium">
+          {submitting ? "Generating…" : "Generate & Download PDF"}
         </button>
         {message && <span className="text-sm text-white/70">{message}</span>}
       </div>
@@ -346,10 +650,30 @@ function FinalNominationForm({ onClose }: { onClose: () => void }) {
     setSubmitting(true);
     setMessage(null);
     try {
-      // Implement API call for final nomination
-      setMessage("Final nomination submitted successfully");
+      const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      
+      const res = await fetch(`${apiBase}/final-nomination`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          vessel_name: form.vessel_name,
+          actual_mgo_tons: form.actual_mgo_tons,
+          mgo_price: Number(form.mgo_price || 0),
+          actual_ifo_tons: form.actual_ifo_tons,
+          ifo_price: Number(form.ifo_price || 0),
+          bunker_date: form.bunker_date,
+        }),
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({ message: `HTTP ${res.status}` }));
+        throw new Error(errorData.message || `HTTP ${res.status}`);
+      }
+
+      const data = await res.json();
+      setMessage(data.message || "✓ Final nomination sent successfully!");
     } catch (err: any) {
-      setMessage(`Error: ${err?.message || "failed"}`);
+      setMessage(`✗ Error: ${err?.message || "Failed to send nomination"}`);
     } finally {
       setSubmitting(false);
     }
@@ -464,38 +788,55 @@ function NominationForm({ onClose }: { onClose: () => void }) {
     setSubmitting(true);
     setMessage(null);
     try {
-      const supplyDateFormatted = (() => {
-        // If user picked a native date (yyyy-mm-dd), convert to DD.MM.YYYY as required
-        const v = form.vessel_supply_date?.trim();
-        if (!v) return "";
-        if (/^\d{4}-\d{2}-\d{2}$/.test(v)) {
-          const [y, m, d] = v.split("-");
-          return `${d}.${m}.${y}`;
-        }
-        return v;
-      })();
+      // Ensure supply date is in DD.MM.YYYY format
+      const supplyDateFormatted = form.vessel_supply_date?.trim() || "";
+      
+      // Determine product type based on quantities
+      const mgoQty = productType === "MGO" || productType === "BOTH" ? form.mgo_tons : "0";
+      const ifoQty = productType === "IFO" || productType === "BOTH" ? form.ifo_tons : "0";
+      
+      const payload = {
+        vessel_name: form.vessel_name,
+        vessel_imo: Number(form.vessel_imo || 0),
+        vessel_flag: form.vessel_flag,
+        vessel_port: form.vessel_port,
+        mgo_tons: mgoQty,
+        mgo_price: Number(form.mgo_price || 0),
+        ifo_tons: ifoQty,
+        ifo_price: Number(form.ifo_price || 0),
+        vessel_supply_date: supplyDateFormatted,
+        vessel_trader: form.vessel_trader,
+        vessel_agent: form.vessel_agent,
+        bdn_numbers: form.bdn_numbers,
+        currency: form.currency,
+        exchange_rate: Number(form.exchange_rate || 1),
+      };
+      
       const res = await fetch(`${apiBase}/endpoint1`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          vessel_name: form.vessel_name,
-          vessel_imo: Number(form.vessel_imo || 0),
-          vessel_port: form.vessel_port,
-          mgo_tons: form.mgo_tons,
-          mgo_price: Number(form.mgo_price || 0),
-          ifo_tons: form.ifo_tons,
-          ifo_price: Number(form.ifo_price || 0),
-          vessel_supply_date: supplyDateFormatted,
-          vessel_trader: form.vessel_trader,
-          vessel_agent: form.vessel_agent,
-        }),
+        body: JSON.stringify(payload),
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({ message: `HTTP ${res.status}` }));
+        throw new Error(errorData.message || `HTTP ${res.status}`);
+      }
+      
       const data = await res.json();
       const firstUrl = data?.files?.[0]?.url;
-      setMessage(firstUrl ? `File: ${firstUrl}` : `Generated successfully`);
+      
+      if (firstUrl) {
+        setMessage(`✓ Generated successfully! File ready.`);
+        // Open file in new tab if S3 URL
+        window.open(firstUrl, '_blank');
+      } else if (data?.local_files?.length > 0) {
+        setMessage(`✓ Generated successfully! File: ${data.local_files[0]}`);
+      } else {
+        setMessage(`✓ Nomination generated and emailed successfully!`);
+      }
     } catch (err: any) {
-      setMessage(`Error: ${err?.message || "failed"}`);
+      setMessage(`✗ Error: ${err?.message || "Failed to generate nomination"}`);
     } finally {
       setSubmitting(false);
     }
@@ -755,7 +1096,7 @@ export default function DashboardPage() {
                 <button
                   key={label}
                   onClick={() => {
-                    if (label === "Generate invoice" || label === "Record trade") {
+                    if (label === "Record trade") {
                       setActiveForm(null);
                     } else {
                       setActiveForm(label);
@@ -780,6 +1121,8 @@ export default function DashboardPage() {
               <FirstNominationForm onClose={() => setActiveForm(null)} />
             ) : activeForm === "Generate final nomination" ? (
               <FinalNominationForm onClose={() => setActiveForm(null)} />
+            ) : activeForm === "Generate invoice" ? (
+              <InvoiceForm onClose={() => setActiveForm(null)} />
             ) : activeForm ? (
               <NominationForm onClose={() => setActiveForm(null)} />
             ) : (
