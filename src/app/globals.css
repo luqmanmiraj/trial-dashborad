@@ -33,12 +33,3 @@ body {
 input:focus {
   transform: scale(1.02);
 }
-
-input:hover {
-  transform: scale(1.01);
-}
-
-/* Glow effect for form */
-form:hover {
-  box-shadow: 0 0 80px rgba(16, 185, 129, 0.2), 0 0 120px rgba(59, 130, 246, 0.1);
-}

@@ -102,7 +102,7 @@ function PortDropdown({ value, onChange }: { value: string; onChange: (val: stri
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 outline-none focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-400/20 transition text-white text-left hover:bg-white/10 flex items-center justify-between"
+        className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 outline-none focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-400/20 transition text-white text-left flex items-center justify-between"
       >
         <span className={value ? "text-white" : "text-white/50"}>{value || "Select port"}</span>
         <svg
@@ -132,7 +132,7 @@ function PortDropdown({ value, onChange }: { value: string; onChange: (val: stri
                 onChange(port);
                 setIsOpen(false);
               }}
-              className={`w-full px-3 py-2 text-left hover:bg-white/10 transition ${
+              className={`w-full px-3 py-2 text-left transition ${
                 value === port ? "bg-emerald-500/20 text-emerald-300" : "text-white"
               }`}
             >
@@ -231,7 +231,7 @@ function NominationForm({ onClose }: { onClose: () => void }) {
     <form onSubmit={submit} className="rounded-2xl border border-white/10 bg-gradient-to-b from-[#11171c] to-[#0c1115] p-5 grid gap-4 w-full">
       <div className="flex items-center justify-between">
         <h3 className="text-xl font-semibold tracking-wide">Generate nomination</h3>
-        <button type="button" className="text-white/60 hover:text-white" onClick={onClose}>Close</button>
+        <button type="button" className="text-white/60" onClick={onClose}>Close</button>
       </div>
       {/* Essentials */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
@@ -256,7 +256,7 @@ function NominationForm({ onClose }: { onClose: () => void }) {
             />
             <button
               type="button"
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-white/80 hover:text-white"
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-white/80"
               onMouseDown={(e) => { e.preventDefault(); try { (dateRef.current as any)?.showPicker?.(); } catch {} }}
               aria-label="Open calendar"
             >
@@ -303,13 +303,13 @@ function NominationForm({ onClose }: { onClose: () => void }) {
       </div>
 
       <div className="flex items-center gap-3 justify-end">
-        <button disabled={submitting} className="px-6 py-2.5 rounded-lg bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 disabled:opacity-50 transition font-medium">
+        <button disabled={submitting} className="px-6 py-2.5 rounded-lg bg-gradient-to-r from-emerald-500 to-teal-500 disabled:opacity-50 transition font-medium">
           {submitting ? "Generating…" : "Generate & email"}
         </button>
         {message && (
           <span className="text-sm text-white/70 truncate max-w-[60ch]">
             {/^https?:\/\//.test(message.replace(/^File: /, "")) ? (
-              <a className="underline hover:text-emerald-300" href={message.replace(/^File: /, "")} target="_blank" rel="noreferrer">
+              <a className="underline" href={message.replace(/^File: /, "")} target="_blank" rel="noreferrer">
                 Download file
               </a>
             ) : (
